@@ -1,20 +1,22 @@
 // Connexion à SmartCampus (SC-11, EF-AUTH-01, EF-AUTH-03) : page plein écran, d'après la maquette validée.
+// SC-18 : décor dans AuthLayout, lien « Mot de passe oublié ? » et message après réinitialisation.
 
 import { useState, type FormEvent } from 'react'
 import { ApiError, login } from '../api/client'
 import { saveSession, type Session } from '../auth/session'
-import { ArrowIcon, CheckIcon, EyeIcon, EyeOffIcon, LockIcon, MailIcon } from '../components/icons'
+import AuthLayout from '../components/AuthLayout'
+import { ArrowIcon, EyeIcon, EyeOffIcon, LockIcon, MailIcon } from '../components/icons'
+import { Link } from '../router'
 
 const INVALID_CREDENTIALS = 'E-mail ou mot de passe incorrect'
 const SERVER_UNREACHABLE = 'Serveur injoignable. Réessayez dans un instant.'
 
-const PERKS = ['Rapide et sécurisé', 'Accessible partout', 'Conçu pour la communauté ENSA']
-
 interface Props {
   onLoggedIn: (session: Session) => void
+  notice?: string | null // message de réussite, par exemple après une réinitialisation
 }
 
-export default function LoginPage({ onLoggedIn }: Props) {
+export default function LoginPage({ onLoggedIn, notice = null }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -44,32 +46,7 @@ export default function LoginPage({ onLoggedIn }: Props) {
   }
 
   return (
-    <main className="login-page">
-      <img className="login-illustration" src="/login-illustration.svg" alt="" />
-
-      <section className="login-hero">
-        <div className="login-brand">
-          <span className="login-wordmark">
-            Smart<span>Campus</span>
-          </span>
-         
-        </div>
-
-        <h1>Simplifiez votre vie universitaire.</h1>
-        <p className="login-lead">
-          Réservation de salles, demandes administratives et bien plus encore.
-        </p>
-
-        <ul className="login-perks">
-          {PERKS.map((perk) => (
-            <li key={perk}>
-              <CheckIcon className="login-check" />
-              {perk}
-            </li>
-          ))}
-        </ul>
-      </section>
-
+    <AuthLayout>
       <form className="login-card" onSubmit={handleSubmit} noValidate>
         <div className="login-card-icon">
           <LockIcon />
@@ -91,7 +68,12 @@ export default function LoginPage({ onLoggedIn }: Props) {
           />
         </div>
 
-        <label htmlFor="password">Mot de passe</label>
+        <div className="login-label-row">
+          <label htmlFor="password">Mot de passe</label>
+          <Link to="/mot-de-passe-oublie" className="login-forgot">
+            Mot de passe oublié ?
+          </Link>
+        </div>
         <div className="login-field login-field-password">
           <LockIcon className="login-field-icon" />
           <input
@@ -113,6 +95,12 @@ export default function LoginPage({ onLoggedIn }: Props) {
           </button>
         </div>
 
+        {notice && !error && (
+          <p className="notice notice-success login-notice" role="status">
+            {notice}
+          </p>
+        )}
+
         {error && (
           <p className="alert" role="alert">
             {error}
@@ -124,6 +112,6 @@ export default function LoginPage({ onLoggedIn }: Props) {
           <ArrowIcon className="login-submit-arrow" />
         </button>
       </form>
-    </main>
+    </AuthLayout>
   )
 }

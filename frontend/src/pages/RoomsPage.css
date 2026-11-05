@@ -1,0 +1,166 @@
+/* Liste des salles (SC-21) : cartes sur une colonne dès 360 px, sans défilement horizontal */
+
+.room-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(16.5rem, 100%), 1fr));
+  gap: 1rem;
+}
+
+.room-grid > li {
+  display: flex;
+  min-width: 0;
+}
+
+.room-card {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.1rem 1.15rem;
+  background: #fff;
+  border: 1px solid var(--sc-line-soft);
+  border-radius: var(--sc-radius-card);
+  box-shadow: 0 1px 2px rgba(15, 27, 61, 0.04);
+}
+
+.room-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.room-card-head h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+  color: var(--sc-ink);
+  overflow-wrap: anywhere;
+}
+
+.room-type {
+  margin: -0.35rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--sc-blue);
+}
+
+.room-meta {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.1rem;
+  margin: 0;
+  padding: 0;
+  font-size: 0.875rem;
+  color: var(--sc-text);
+}
+
+.room-meta li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.room-meta svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--sc-muted);
+}
+
+.room-equipment {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--sc-muted);
+}
+
+.room-description {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--sc-muted);
+}
+
+/* État vide : icône, texte et éventuel bouton */
+.empty-state .empty-icon {
+  display: block;
+  width: 28px;
+  height: 28px;
+  margin: 0 auto 0.6rem;
+  color: var(--sc-blue);
+}
+
+.empty-state p {
+  margin: 0 0 0.75rem;
+}
+
+.empty-state p:last-child {
+  margin-bottom: 0;
+}
+
+/* Recherche d'une salle libre (SC-22) */
+
+.room-search .form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+}
+
+.room-results {
+  margin-top: 0.5rem;
+}
+
+.results-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.results-head h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  letter-spacing: -0.01em;
+  color: var(--sc-ink);
+}
+
+.results-head p {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: var(--sc-muted);
+}
+
+/* Lien vers le planning de la salle (SC-23) */
+.room-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--sc-line-soft);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--sc-blue);
+  text-decoration: none;
+}
+
+.room-card-link svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.15s ease;
+}
+
+.room-card-link:hover svg {
+  transform: translateX(3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .room-card-link svg {
+    transition: none;
+  }
+}

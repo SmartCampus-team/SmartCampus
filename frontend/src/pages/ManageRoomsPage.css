@@ -1,0 +1,9 @@
+/* Gestion des salles (SC-20) */
+
+.manage-message {
+  margin: 0 0 1.25rem;
+}
+
+.room-form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}

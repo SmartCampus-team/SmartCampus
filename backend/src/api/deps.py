@@ -1,5 +1,7 @@
-"""Dépendances FastAPI communes : utilisateur connecté à partir du jeton (SC-15, ENF-02)."""
+"""Dépendances FastAPI communes : utilisateur connecté à partir du jeton (SC-15, ENF-02)
+et contrôle du rôle sur les routes protégées (SC-17, ENF-03)."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated
@@ -10,13 +12,14 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from src.database import get_db
-from src.models.user import User
+from src.models.user import Role, User
 from src.services import token_service
 from src.services.common import AuthError
 from src.services.security import decode_access_token
 
 AUTH_REQUIRED = "Authentification requise. Veuillez vous reconnecter."
 SESSION_EXPIRED = "Session expirée. Veuillez vous reconnecter."
+FORBIDDEN = "Vous n'avez pas les droits nécessaires pour cette action."
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -60,3 +63,18 @@ def get_current_user(
     session: Annotated[CurrentSession, Depends(get_current_session)],
 ) -> User:
     return session.user
+
+
+def require_roles(*roles: Role) -> Callable[..., User]:
+    """Dépendance qui refuse (403) un utilisateur connecté dont le rôle n'est pas dans la liste.
+
+    Usage : user: Annotated[User, Depends(require_roles(Role.GESTIONNAIRE))]
+    Le rôle est relu en base à chaque requête : un changement de rôle s'applique tout de suite.
+    """
+
+    def check_role(user: Annotated[User, Depends(get_current_user)]) -> User:
+        if user.role not in roles:
+            raise AuthError(403, FORBIDDEN)
+        return user
+
+    return check_role

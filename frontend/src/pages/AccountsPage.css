@@ -1,0 +1,32 @@
+/* Gestion des comptes (SC-17) */
+
+.page-message {
+  margin: 0 0 1.25rem;
+}
+
+.account-form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.button-secondary.is-compact {
+  min-height: 2.25rem;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.button-secondary.is-danger {
+  color: #b42318;
+}
+
+.button-secondary.is-danger:hover:not(:disabled) {
+  background: var(--sc-danger-bg);
+  border-color: #f3c7c7;
+}
+
+.empty-state .empty-icon {
+  display: block;
+  width: 28px;
+  height: 28px;
+  margin: 0 auto 0.6rem;
+  color: var(--sc-blue);
+}

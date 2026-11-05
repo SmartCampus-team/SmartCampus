@@ -1,0 +1,18 @@
+/* Avatar avec photo de profil (SC-19) : la photo remplit le rond des initiales */
+
+.avatar,
+.profile-avatar {
+  overflow: hidden;
+}
+
+.avatar img,
+.profile-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.topbar-user-link.is-active .avatar {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--sc-blue);
+}

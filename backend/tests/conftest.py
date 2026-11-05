@@ -21,6 +21,7 @@ TEST_DATABASE_URL = (
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["BCRYPT_ROUNDS"] = "4"  # hachage rapide pour les tests uniquement
 os.environ["ALLOWED_EMAIL_DOMAIN"] = "usms.ac.ma"
+os.environ["MAIL_BACKEND"] = "memory"  # e-mails gardés en mémoire, jamais envoyés (SC-18)
 
 import pytest
 from fastapi.testclient import TestClient

@@ -6,4 +6,6 @@ psycopg[binary]==3.3.6
 pydantic-settings==2.15.0
 bcrypt==5.0.0
 PyJWT==2.15.1
+# Fuseaux horaires pour zoneinfo (indispensable sous Windows), heure du campus (RG-03)
+tzdata==2026.6
 

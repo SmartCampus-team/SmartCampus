@@ -1,0 +1,70 @@
+/* Pages sans session : connexion, mot de passe oublié, réinitialisation (SC-18).
+   Les sélecteurs commencent par .login-card pour passer devant ceux de styles.css. */
+
+.login-card .login-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.45rem;
+}
+
+.login-card .login-label-row label {
+  margin-bottom: 0;
+}
+
+.login-card .login-forgot,
+.login-card .login-back {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--sc-blue);
+  text-decoration: none;
+}
+
+.login-card .login-forgot:hover,
+.login-card .login-back:hover {
+  text-decoration: underline;
+}
+
+.login-card .login-back {
+  align-self: center;
+  margin-top: 1.25rem;
+}
+
+.login-card .login-notice {
+  margin: 0 0 1.25rem;
+}
+
+.login-card .login-text {
+  margin: 0 0 1.5rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--sc-text);
+  text-align: center;
+}
+
+.login-card .password-rules {
+  margin: -0.75rem 0 1.25rem;
+  font-size: 0.8rem;
+  color: var(--sc-muted);
+}
+
+.login-card .password-rules.is-error {
+  color: var(--sc-danger);
+}
+
+/* Lien affiché comme le bouton principal de la carte */
+.login-card a.login-submit {
+  height: auto;
+  min-height: 3rem;
+  padding-block: 0.6rem;
+  text-align: center;
+  line-height: 1.3;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.login-card a.login-submit:hover {
+  background: var(--sc-blue-dark);
+}
