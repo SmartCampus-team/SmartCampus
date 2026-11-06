@@ -25,3 +25,9 @@ spec:
 
           ports:
             - containerPort: 8000
+
+          envFrom:
+            - configMapRef:
+                name: smartcampus-config
+            - secretRef:
+                name: smartcampus-secret
