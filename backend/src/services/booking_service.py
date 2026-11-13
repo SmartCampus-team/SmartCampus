@@ -7,6 +7,8 @@ la demande validée par le gestionnaire arrive avec SC-50 (RG-09).
 
 Les dates sont stockées en UTC (timestamptz) et affichées à l'heure du campus (Africa/Casablanca).
 
+SC-26 (RG-04, RG-07) : horizon et quotas, lus dans la table settings (quota_service.py).
+
 SC-27 (EF-BOOK-02, RG-01, ENF-06) : une salle n'est jamais attribuée deux fois sur le même créneau.
 La salle est verrouillée (SELECT … FOR UPDATE) le temps de vérifier blocages et réservations puis
 d'enregistrer : deux demandes simultanées passent l'une après l'autre. La contrainte d'exclusion de
@@ -24,7 +26,7 @@ from src.models.blocking import Blocking
 from src.models.booking import OCCUPYING_STATUSES, Booking, BookingStatus
 from src.models.room import Room, RoomStatus, RoomType
 from src.models.user import Role, User
-from src.services import audit_service, campus_clock, room_service
+from src.services import audit_service, campus_clock, quota_service, room_service
 from src.services.common import ServiceError
 
 # Rôles qui réservent pour eux-mêmes ; le gestionnaire gère les salles sans réserver
@@ -148,6 +150,8 @@ def create_booking(
 ) -> Booking:
     """Crée une réservation « Confirmée » et l'écrit dans AuditLog ; 400, 404 ou 409 sinon."""
     start_at, end_at = check_slot(user, day, start, end)
+    quota_service.check_horizon(db, user, start_at)
+    quota_service.check_quotas(db, user, start_at, end_at)
     room = lock_room(db, room_id)  # 404 si inconnue ou archivée
     check_room(room, participants)
     check_free(db, room, start_at, end_at)
