@@ -45,7 +45,7 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Gestion des salles',
     Icon: SettingsIcon,
     roles: ['gestionnaire'],
-    isActive: (path) => path === '/gestion/salles',
+    isActive: (path) => path.startsWith('/gestion/'), // salles et catalogue d'équipements (SC-31)
   },
   {
     to: '/admin/comptes',

@@ -4,6 +4,7 @@ import { canBook } from './api/bookings'
 import { loadSession, saveSession, type Session, type SessionUser } from './auth/session'
 import AppLayout from './components/AppLayout'
 import AccountsPage from './pages/AccountsPage'
+import EquipmentPage from './pages/EquipmentPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
@@ -37,6 +38,11 @@ function renderPage(session: Session, location: Location, onUserUpdated: (user: 
   if (path === '/gestion/salles') {
     if (session.user.role !== 'gestionnaire') return <Forbidden />
     return <ManageRoomsPage session={session} />
+  }
+  if (path === '/gestion/equipements') {
+    // SC-31 : catalogue d'équipements, réservé au gestionnaire (l'API refuse aussi : 403)
+    if (session.user.role !== 'gestionnaire') return <Forbidden />
+    return <EquipmentPage session={session} />
   }
   if (path === '/admin/comptes') {
     // L'API refuse aussi (403) : ce contrôle évite seulement d'afficher une page inutilisable

@@ -3,6 +3,7 @@
 import type { Session } from '../auth/session'
 import { withQuery } from '../router'
 import { apiJson } from './client'
+import type { Equipment } from './equipment'
 
 export type RoomType = 'amphitheatre' | 'salle_cours' | 'salle_td' | 'salle_tp' | 'salle_travail'
 export type RoomStatus = 'active' | 'hors_service' | 'archivee'
@@ -15,6 +16,7 @@ export interface Room {
   capacity: number
   status: RoomStatus
   description: string | null
+  equipment: Equipment[] // SC-31, par ordre alphabétique
 }
 
 export interface RoomInput {
@@ -46,6 +48,7 @@ export interface RoomFilters {
   building?: string
   room_type?: RoomType | ''
   min_capacity?: number | null
+  equipment?: number[] // SC-31 : la salle doit avoir chacun de ces équipements
 }
 
 export function fetchRooms(
