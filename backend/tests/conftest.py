@@ -35,8 +35,10 @@ if not (make_url(TEST_DATABASE_URL).database or "").endswith("_test"):
 import src.models
 from src.database import Base, SessionLocal, engine
 from src.main import app
+from src.models.setting import Setting
 from src.models.user import Role, User
 from src.services.security import hash_password
+from tests.factories import DEFAULT_SETTINGS
 from tests.helpers import PASSWORD
 
 for _module in pkgutil.iter_modules(src.models.__path__):
@@ -70,6 +72,13 @@ def db() -> Iterator[Session]:
         yield session
     finally:
         session.close()
+
+
+@pytest.fixture(autouse=True)
+def default_settings(db: Session) -> None:
+    """Valeurs des règles de gestion, comme après « alembic upgrade head » (SC-26)."""
+    db.add_all(Setting(key=key, value=value, description=key) for key, value in DEFAULT_SETTINGS.items())
+    db.commit()
 
 
 @pytest.fixture
