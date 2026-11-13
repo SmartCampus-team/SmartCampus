@@ -1,13 +1,18 @@
 // Gestion des salles par le gestionnaire : créer, modifier, archiver (SC-20, EF-ROOM-04, ENF-03).
 // SC-23 : lien vers le planning, y compris d'une salle archivée (réservations passées).
+// SC-31 : colonne des équipements et lien vers le catalogue d'équipements.
+// SC-32 : bloquer une salle sur une période (icône cadenas).
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import type { BlockingCreated } from '../api/blockings'
 import { errorMessage } from '../api/client'
 import { archiveRoom, fetchRooms, ROOM_STATUS_LABELS, ROOM_TYPE_LABELS, type Room } from '../api/rooms'
 import type { Session } from '../auth/session'
 import Dialog from '../components/Dialog'
-import { ArchiveIcon, CalendarIcon, PencilIcon, PlusIcon } from '../components/icons'
+import { ArchiveIcon, CalendarIcon, LockIcon, PencilIcon, PlusIcon, SettingsIcon } from '../components/icons'
+import { defaultSlot } from '../dates'
 import { Link } from '../router'
+import BlockingDialog, { formatMoment } from './BlockingDialog'
 import { planningPath } from './RoomPlanningPage'
 import RoomFormDialog from './RoomFormDialog'
 import './ManageRoomsPage.css'
@@ -28,6 +33,7 @@ export default function ManageRoomsPage({ session }: Props) {
   const [filter, setFilter] = useState('')
   const [editing, setEditing] = useState<Room | 'new' | null>(null)
   const [archiving, setArchiving] = useState<Room | null>(null)
+  const [blocking, setBlocking] = useState<Room | null>(null)
   const [archiveError, setArchiveError] = useState<string | null>(null)
   const [archiveBusy, setArchiveBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -64,6 +70,17 @@ export default function ManageRoomsPage({ session }: Props) {
     load()
   }
 
+  function handleBlocked(created: BlockingCreated) {
+    const room = blocking?.code ?? ''
+    setBlocking(null)
+    const count = created.cancelled_bookings
+    setMessage(
+      `Salle ${room} bloquée du ${formatMoment(created.start_date, created.start_time)} au ` +
+        `${formatMoment(created.end_date, created.end_time)} : ${created.reason}. ` +
+        (count === 0 ? 'Aucune réservation à annuler.' : `${count} réservation${count > 1 ? 's' : ''} annulée${count > 1 ? 's' : ''}.`),
+    )
+  }
+
   async function handleArchive(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!archiving) return
@@ -93,17 +110,23 @@ export default function ManageRoomsPage({ session }: Props) {
           <h1>Gestion des salles</h1>
           <p>Créez, modifiez et archivez les salles du campus. Une salle archivée n'est jamais supprimée.</p>
         </div>
-        <button
-          type="button"
-          className="button-primary"
-          onClick={() => {
-            setMessage(null)
-            setEditing('new')
-          }}
-        >
-          <PlusIcon />
-          Nouvelle salle
-        </button>
+        <div className="manage-actions">
+          <Link to="/gestion/equipements" className="button-secondary">
+            <SettingsIcon />
+            Catalogue d'équipements
+          </Link>
+          <button
+            type="button"
+            className="button-primary"
+            onClick={() => {
+              setMessage(null)
+              setEditing('new')
+            }}
+          >
+            <PlusIcon />
+            Nouvelle salle
+          </button>
+        </div>
       </header>
 
       {message && (
@@ -163,6 +186,7 @@ export default function ManageRoomsPage({ session }: Props) {
                 <th scope="col">Type</th>
                 <th scope="col">Bâtiment</th>
                 <th scope="col">Capacité</th>
+                <th scope="col">Équipements</th>
                 <th scope="col">Statut</th>
                 <th scope="col">
                   <span className="visually-hidden">Actions</span>
@@ -178,6 +202,9 @@ export default function ManageRoomsPage({ session }: Props) {
                     <td>{ROOM_TYPE_LABELS[room.room_type]}</td>
                     <td>{room.building}</td>
                     <td>{room.capacity}</td>
+                    <td className="cell-equipment">
+                      {room.equipment.length > 0 ? room.equipment.map((item) => item.label).join(', ') : '—'}
+                    </td>
                     <td>
                       <span className={STATUS_BADGE[room.status]}>{ROOM_STATUS_LABELS[room.status]}</span>
                     </td>
@@ -204,6 +231,18 @@ export default function ManageRoomsPage({ session }: Props) {
                               title="Modifier"
                             >
                               <PencilIcon />
+                            </button>
+                            <button
+                              type="button"
+                              className="icon-button"
+                              onClick={() => {
+                                setMessage(null)
+                                setBlocking(room)
+                              }}
+                              aria-label={`Bloquer la salle ${room.code}`}
+                              title="Bloquer sur une période"
+                            >
+                              <LockIcon />
                             </button>
                             <button
                               type="button"
@@ -236,6 +275,16 @@ export default function ManageRoomsPage({ session }: Props) {
           buildings={buildings}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
+        />
+      )}
+
+      {blocking && (
+        <BlockingDialog
+          session={session}
+          room={blocking}
+          initialDate={defaultSlot().date}
+          onClose={() => setBlocking(null)}
+          onBlocked={handleBlocked}
         />
       )}
 
