@@ -25,6 +25,7 @@ os.environ["MAIL_BACKEND"] = "memory"  # e-mails gardés en mémoire, jamais env
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
@@ -44,6 +45,10 @@ for _module in pkgutil.iter_modules(src.models.__path__):
 
 @pytest.fixture(scope="session", autouse=True)
 def schema() -> Iterator[None]:
+    with engine.begin() as conn:
+        # Contrainte d'exclusion des réservations (SC-27) ; extension « de confiance » :
+        # le propriétaire de la base peut la créer sans être superutilisateur
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     yield
