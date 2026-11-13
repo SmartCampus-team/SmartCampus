@@ -9,9 +9,27 @@ from sqlalchemy.orm import Session
 from src.models.blocking import Blocking
 from src.models.booking import Booking, BookingStatus
 from src.models.room import Room, RoomStatus, RoomType
+from src.models.setting import Setting
 from src.models.user import Role, User
 from src.services import campus_clock
 from tests.helpers import auth_header, login
+
+
+# Mêmes valeurs que la migration 0009 (horizon RG-04, quotas RG-07) ; les tests les lisent en base (SC-26)
+DEFAULT_SETTINGS = {
+    "booking_horizon_days_student": "7",
+    "booking_horizon_days_teacher": "30",
+    "max_upcoming_bookings_student": "4",
+    "max_weekly_hours_student": "8",
+}
+
+
+def set_setting(db: Session, key: str, value: int) -> None:
+    """Change une règle de gestion, comme le fera l'écran de SC-59."""
+    setting = db.get(Setting, key)
+    assert setting is not None
+    setting.value = str(value)
+    db.commit()
 
 
 def headers_for(
