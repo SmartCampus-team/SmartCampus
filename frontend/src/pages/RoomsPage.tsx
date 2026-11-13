@@ -1,6 +1,6 @@
 // Salles : la liste des salles du campus (SC-21, EF-ROOM-01) et la recherche d'une salle libre
 // sur un créneau (SC-22, EF-ROOM-02), avec un lien vers le planning de chaque salle (SC-23).
-// SC-25 : chaque salle libre trouvée se réserve sur le créneau cherché (EF-BOOK-01).
+// SC-25 : chaque salle libre trouvée se réserve sur le créneau cherché (EF-BOOK-01) ; SC-28 : lien vers « Mes réservations ».
 // Les critères de recherche sont dans l'URL :
 // #/salles?date=2026-11-02&debut=10:00&fin=12:00&participants=20
 
@@ -405,7 +405,7 @@ export default function RoomsPage({ session, location }: Props) {
               <span>
                 Réservation confirmée : salle {confirmation.room.code}, {formatLongDate(confirmation.date)},{' '}
                 {shortTime(confirmation.start)} – {shortTime(confirmation.end)}.{' '}
-                <Link to={planningPath(confirmation.room.id, { date: confirmation.date })}>Voir le planning</Link>
+                <Link to="/reservations">Voir mes réservations</Link>
               </span>
             </p>
           )}

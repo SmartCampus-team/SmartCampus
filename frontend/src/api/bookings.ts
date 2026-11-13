@@ -1,4 +1,4 @@
-// Réservations des salles (SC-25, EF-BOOK-01).
+// Réservations des salles (SC-25, EF-BOOK-01) et « Mes réservations » (SC-28, EF-BOOK-03).
 
 import type { Role, Session } from '../auth/session'
 import { apiJson } from './client'
@@ -54,4 +54,16 @@ export function canBook(role: Role): boolean {
 
 export function createBooking(session: Session, input: BookingInput): Promise<Booking> {
   return apiJson<Booking>(session, '/api/bookings', 'POST', input)
+}
+
+// « Mes réservations » (SC-28, EF-BOOK-03) : les trois onglets, calculés par l'API
+
+export interface MyBookings {
+  upcoming: Booking[] // la plus proche d'abord
+  past: Booking[] // la plus récente d'abord
+  cancelled: Booking[]
+}
+
+export function fetchMyBookings(session: Session): Promise<MyBookings> {
+  return apiJson<MyBookings>(session, '/api/bookings/me')
 }

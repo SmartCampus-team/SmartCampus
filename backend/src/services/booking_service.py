@@ -13,13 +13,16 @@ SC-27 (EF-BOOK-02, RG-01, ENF-06) : une salle n'est jamais attribuée deux fois 
 La salle est verrouillée (SELECT … FOR UPDATE) le temps de vérifier blocages et réservations puis
 d'enregistrer : deux demandes simultanées passent l'une après l'autre. La contrainte d'exclusion de
 la table bookings reste le dernier filet : si elle refuse, l'API répond aussi 409.
+
+SC-28 (EF-BOOK-03) : « Mes réservations », à venir, passées et annulées ; chacun ne voit que les siennes.
 """
 
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from src.config import settings
 from src.models.blocking import Blocking
@@ -94,6 +97,38 @@ def check_room(room: Room, participants: int) -> None:
         raise ServiceError(
             400, TOO_MANY_PARTICIPANTS.format(code=room.code, capacity=room.capacity, participants=participants)
         )
+
+
+@dataclass
+class MyBookings:
+    upcoming: list[Booking]  # en attente ou confirmées, pas encore terminées ; la plus proche d'abord
+    past: list[Booking]  # terminées ; la plus récente d'abord
+    cancelled: list[Booking]  # annulées ou refusées ; la plus récente d'abord
+
+
+CANCELLED_STATUSES = (BookingStatus.ANNULEE, BookingStatus.REFUSEE)
+
+
+def list_mine(db: Session, user: User, now: datetime | None = None) -> MyBookings:
+    """Les réservations de l'utilisateur, et seulement les siennes, réparties en trois onglets."""
+    now = now or campus_clock.now()
+    bookings = db.scalars(
+        select(Booking)
+        .where(Booking.holder_id == user.id)
+        .options(selectinload(Booking.room))
+        .order_by(Booking.start_at)
+    ).all()
+    mine = MyBookings(upcoming=[], past=[], cancelled=[])
+    for booking in bookings:
+        if booking.status in CANCELLED_STATUSES:
+            mine.cancelled.append(booking)
+        elif booking.end_at > now and booking.status in OCCUPYING_STATUSES:
+            mine.upcoming.append(booking)
+        else:
+            mine.past.append(booking)
+    mine.past.reverse()
+    mine.cancelled.reverse()
+    return mine
 
 
 def lock_room(db: Session, room_id: int) -> Room:

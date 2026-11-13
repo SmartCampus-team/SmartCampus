@@ -1,7 +1,7 @@
 """Outils de test partagés des tickets des Sprints 2 et 3."""
 
 from collections.abc import Callable
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -90,6 +90,30 @@ def make_booking(
         status=status,
         purpose=purpose,
         participants=participants,
+    )
+    db.add(booking)
+    db.commit()
+    return booking
+
+
+def make_booking_at(
+    db: Session,
+    room: Room,
+    holder: User,
+    start_at: datetime,
+    end_at: datetime,
+    status: BookingStatus = BookingStatus.CONFIRMEE,
+    purpose: str = "Cours",
+) -> Booking:
+    """Réservation à une date et heure précises, par exemple déjà commencée (SC-28)."""
+    booking = Booking(
+        room_id=room.id,
+        holder_id=holder.id,
+        start_at=start_at,
+        end_at=end_at,
+        status=status,
+        purpose=purpose,
+        participants=4,
     )
     db.add(booking)
     db.commit()
