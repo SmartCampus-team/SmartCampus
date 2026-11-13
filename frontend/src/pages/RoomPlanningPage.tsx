@@ -3,6 +3,7 @@
 // libellé (Réservé, En attente de validation, Bloqué), pas seulement une couleur.
 // Adresse : #/salles/3?date=2026-11-02&vue=semaine
 // SC-25 : l'étudiant et l'enseignant réservent la salle depuis son planning (EF-BOOK-01).
+// SC-28 : on y revient aussi depuis « Mes réservations ».
 
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { canBook, type Booking } from '../api/bookings'
@@ -92,7 +93,8 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
   const date = isValidIsoDate(location.query.get('date')) ? (location.query.get('date') as string) : today
   const view: PlanningView = location.query.get('vue') === 'semaine' ? 'week' : 'day'
   const back = location.query.get('retour')
-  const backTo = back && (back.startsWith('/salles') || back.startsWith('/gestion/salles')) ? back : '/salles'
+  const backTo =
+    back && ['/salles', '/gestion/salles', '/reservations'].some((prefix) => back.startsWith(prefix)) ? back : '/salles'
 
   const [planning, setPlanning] = useState<Planning | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -161,7 +163,11 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
     <>
       <Link to={backTo} className="back-link">
         <ChevronLeftIcon />
-        {backTo.startsWith('/gestion') ? 'Retour à la gestion des salles' : 'Retour aux salles'}
+        {backTo.startsWith('/gestion')
+          ? 'Retour à la gestion des salles'
+          : backTo.startsWith('/reservations')
+            ? 'Retour à mes réservations'
+            : 'Retour aux salles'}
       </Link>
 
       <header className="page-head">
@@ -205,7 +211,8 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
         <p className="notice notice-success planning-status" role="status">
           <span>
             Réservation confirmée : {formatLongDate(confirmation.date)}, {shortTime(confirmation.start)} –{' '}
-            {shortTime(confirmation.end)}, « {confirmation.purpose} ».
+            {shortTime(confirmation.end)}, « {confirmation.purpose} ».{' '}
+            <Link to="/reservations">Voir mes réservations</Link>
           </span>
         </p>
       )}

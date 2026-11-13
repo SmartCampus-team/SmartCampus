@@ -1,5 +1,6 @@
 
 import { useCallback, useState } from 'react'
+import { canBook } from './api/bookings'
 import { loadSession, saveSession, type Session, type SessionUser } from './auth/session'
 import AppLayout from './components/AppLayout'
 import AccountsPage from './pages/AccountsPage'
@@ -7,6 +8,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import ManageRoomsPage from './pages/ManageRoomsPage'
+import MyBookingsPage from './pages/MyBookingsPage'
 import ProfilePage from './pages/ProfilePage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import RoomPlanningPage from './pages/RoomPlanningPage'
@@ -23,6 +25,11 @@ function renderPage(session: Session, location: Location, onUserUpdated: (user: 
   if (path === '/') return <HomePage user={session.user} />
   if (path === '/profil') return <ProfilePage session={session} onUserUpdated={onUserUpdated} />
   if (path === '/salles') return <RoomsPage session={session} location={location} />
+  if (path === '/reservations') {
+    // SC-28 : l'étudiant et l'enseignant ont des réservations ; l'API refuse aussi les autres rôles (403)
+    if (!canBook(session.user.role)) return <Forbidden />
+    return <MyBookingsPage session={session} location={location} />
+  }
   const room = matchPath('/salles/:id', path)
   if (room && /^\d+$/.test(room.id)) {
     return <RoomPlanningPage key={room.id} session={session} roomId={Number(room.id)} location={location} />

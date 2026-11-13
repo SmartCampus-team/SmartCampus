@@ -1,0 +1,198 @@
+/* « Mes réservations » (SC-28) : trois onglets, une carte par réservation, lisible dès 360 px */
+
+.booking-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--sc-line);
+  overflow-x: auto;
+}
+
+.booking-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.9rem;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--sc-muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.booking-tab:hover:not(:disabled) {
+  background: var(--sc-hover);
+  color: var(--sc-ink);
+}
+
+.booking-tab.is-active {
+  border-bottom-color: var(--sc-blue);
+  color: var(--sc-blue);
+}
+
+.booking-tab:focus-visible {
+  outline: 2px solid var(--sc-blue);
+  outline-offset: -2px;
+}
+
+.booking-tab-count {
+  min-width: 1.5rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: var(--sc-line-soft);
+  color: var(--sc-text);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.booking-tab.is-active .booking-tab-count {
+  background: var(--sc-tint);
+  color: var(--sc-blue);
+}
+
+.booking-list {
+  list-style: none;
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+}
+
+.booking-item {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  background: #fff;
+  border: 1px solid var(--sc-line-soft);
+  border-radius: var(--sc-radius-card);
+  box-shadow: 0 1px 2px rgba(15, 27, 61, 0.04);
+}
+
+/* Pavé de date : jour et mois */
+.booking-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  align-self: start;
+  height: 3.5rem;
+  border-radius: 12px;
+  background: var(--sc-tint);
+  color: var(--sc-blue);
+  line-height: 1.1;
+}
+
+.booking-day-number {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.booking-day-month {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.booking-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.booking-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.75rem;
+}
+
+.booking-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--sc-ink);
+}
+
+.booking-head h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.booking-head h3 a:hover {
+  color: var(--sc-blue);
+  text-decoration: underline;
+}
+
+.booking-meta {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.1rem;
+  margin: 0;
+  padding: 0;
+  font-size: 0.875rem;
+}
+
+.booking-meta li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.booking-meta svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--sc-muted);
+}
+
+.booking-purpose {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--sc-muted);
+  overflow-wrap: anywhere;
+}
+
+.booking-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.25rem;
+}
+
+/* Lien « Réserver une salle » présenté comme le bouton principal de la page */
+.booking-cta {
+  padding: 0.6rem 1.1rem;
+  border-radius: var(--sc-radius-control);
+  background: var(--sc-blue);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.booking-cta:hover {
+  background: var(--sc-blue-dark);
+}
+
+@media (max-width: 400px) {
+  .booking-tab {
+    padding: 0.5rem 0.6rem;
+    font-size: 0.9rem;
+  }
+
+  .booking-item {
+    grid-template-columns: 3rem minmax(0, 1fr);
+    gap: 0.75rem;
+    padding: 0.9rem;
+  }
+
+  .booking-day {
+    height: 3rem;
+  }
+}

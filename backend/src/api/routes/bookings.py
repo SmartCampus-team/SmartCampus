@@ -1,4 +1,4 @@
-"""Réservations des salles (SC-25 : EF-BOOK-01)."""
+"""Réservations des salles (SC-25 : EF-BOOK-01) et « Mes réservations » (SC-28 : EF-BOOK-03)."""
 
 from datetime import date as Date
 from datetime import datetime, time
@@ -70,6 +70,28 @@ def booking_out(booking: Booking) -> BookingOut:
         participants=booking.participants,
         status=booking.status,
         created_at=booking.created_at,
+    )
+
+
+class MyBookingsOut(BaseModel):
+    """Les trois onglets de « Mes réservations »."""
+
+    upcoming: list[BookingOut]
+    past: list[BookingOut]
+    cancelled: list[BookingOut]
+
+
+@router.get("/me", response_model=MyBookingsOut)
+def my_bookings(user: Booker, db: Db) -> MyBookingsOut:
+    """Mes réservations à venir (la plus proche d'abord), passées et annulées (les plus récentes d'abord).
+
+    Seules les réservations de l'utilisateur connecté sont renvoyées (RG-12).
+    """
+    mine = booking_service.list_mine(db, user)
+    return MyBookingsOut(
+        upcoming=[booking_out(booking) for booking in mine.upcoming],
+        past=[booking_out(booking) for booking in mine.past],
+        cancelled=[booking_out(booking) for booking in mine.cancelled],
     )
 
 
