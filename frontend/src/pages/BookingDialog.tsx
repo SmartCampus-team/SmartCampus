@@ -1,16 +1,14 @@
 // Réserver une salle sur un créneau (SC-25, EF-BOOK-01), depuis la recherche ou le planning.
-// SC-30 (EF-BOOK-05) : le même formulaire modifie une réservation non commencée (autre créneau,
-// autre salle) ; si l'API refuse, la réservation d'origine reste inchangée.
 // L'interface vérifie la grille (RG-03), la durée selon le rôle et la capacité (RG-08) ;
 // l'API applique les mêmes règles et son message s'affiche s'il refuse.
 
-import { useEffect, useState, type FormEvent } from 'react'
-import { createBooking, MAX_BOOKING_MINUTES, updateBooking, type Booking } from '../api/bookings'
+import { useState, type FormEvent } from 'react'
+import { createBooking, MAX_BOOKING_MINUTES, type Booking } from '../api/bookings'
 import { errorMessage } from '../api/client'
-import { fetchRooms, ROOM_TYPE_LABELS, type Room } from '../api/rooms'
+import { ROOM_TYPE_LABELS, type Room } from '../api/rooms'
 import type { Session } from '../auth/session'
 import Dialog from '../components/Dialog'
-import { CLOSING, isOpenDay, isValidIsoDate, OPENING, shortTime, STEP_MINUTES, timeOptions, toMinutes } from '../dates'
+import { CLOSING, isOpenDay, isValidIsoDate, OPENING, STEP_MINUTES, timeOptions, toMinutes } from '../dates'
 import './BookingDialog.css'
 
 export interface BookingDraft {
@@ -22,9 +20,8 @@ export interface BookingDraft {
 
 interface Props {
   session: Session
-  room?: Room // création : la salle choisie
-  booking?: Booking // modification (SC-30) : la réservation à changer
-  initial?: BookingDraft // création : créneau proposé
+  room: Room
+  initial: BookingDraft
   onClose: () => void
   onBooked: (booking: Booking) => void
 }
@@ -50,7 +47,7 @@ export function formatDuration(minutes: number): string {
   return rest ? `${hours} h ${String(rest).padStart(2, '0')}` : `${hours} h`
 }
 
-function validate(form: FormState, capacity: number, maxMinutes: number): Errors {
+function validate(form: FormState, room: Room, maxMinutes: number): Errors {
   const errors: Errors = {}
   if (!isValidIsoDate(form.date)) errors.date = 'Choisissez une date.'
   else if (!isOpenDay(form.date)) errors.date = 'Le campus est fermé le dimanche.'
@@ -68,49 +65,23 @@ function validate(form: FormState, capacity: number, maxMinutes: number): Errors
   const participants = Number(form.participants)
   if (!form.participants || !Number.isInteger(participants) || participants < 1) {
     errors.participants = 'Indiquez le nombre de participants.'
-  } else if (participants > capacity) {
-    errors.participants = `La salle compte ${capacity} places : choisissez une salle plus grande.`
+  } else if (participants > room.capacity) {
+    errors.participants = `La salle compte ${room.capacity} places : choisissez une salle plus grande.`
   }
 
   if (form.purpose.trim().length < 3) errors.purpose = 'Indiquez le motif (3 caractères au moins).'
   return errors
 }
 
-function initialForm(booking?: Booking, initial?: BookingDraft): FormState {
-  if (booking) {
-    return {
-      date: booking.date,
-      start: shortTime(booking.start),
-      end: shortTime(booking.end),
-      participants: String(booking.participants),
-      purpose: booking.purpose,
-    }
-  }
-  return {
-    date: initial?.date ?? '',
-    start: initial?.start ?? '10:00',
-    end: initial?.end ?? '11:00',
-    participants: initial?.participants ?? '',
-    purpose: '',
-  }
-}
-
-export default function BookingDialog({ session, room, booking, initial, onClose, onBooked }: Props) {
+export default function BookingDialog({ session, room, initial, onClose, onBooked }: Props) {
   const maxMinutes = MAX_BOOKING_MINUTES[session.user.role] ?? 0
-  const [form, setForm] = useState<FormState>(() => initialForm(booking, initial))
-  // Modification : la salle se choisit parmi les salles actives, hors amphithéâtres (SC-50)
-  const [rooms, setRooms] = useState<Room[]>([])
-  const [roomId, setRoomId] = useState<number>(booking?.room.id ?? room?.id ?? 0)
-
-  useEffect(() => {
-    if (!booking) return
-    fetchRooms(session)
-      .then((list) => setRooms(list.filter((item) => item.status === 'active' && item.room_type !== 'amphitheatre')))
-      .catch(() => setRooms([]))
-  }, [session, booking])
-
-  const chosen = room ?? rooms.find((item) => item.id === roomId) ?? booking?.room
-  const capacity = chosen?.capacity ?? 0
+  const [form, setForm] = useState<FormState>({
+    date: initial.date,
+    start: initial.start,
+    end: initial.end,
+    participants: initial.participants ?? '',
+    purpose: '',
+  })
   const [errors, setErrors] = useState<Errors>({})
   const [serverError, setServerError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -121,22 +92,22 @@ export default function BookingDialog({ session, room, booking, initial, onClose
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const found = validate(form, capacity, maxMinutes)
+    const found = validate(form, room, maxMinutes)
     setErrors(found)
     setServerError(null)
     if (Object.keys(found).length > 0) return
 
-    const input = {
-      room_id: roomId,
-      date: form.date,
-      start: form.start,
-      end: form.end,
-      purpose: form.purpose.trim(),
-      participants: Number(form.participants),
-    }
     setBusy(true)
     try {
-      onBooked(booking ? await updateBooking(session, booking.id, input) : await createBooking(session, input))
+      const booking = await createBooking(session, {
+        room_id: room.id,
+        date: form.date,
+        start: form.start,
+        end: form.end,
+        purpose: form.purpose.trim(),
+        participants: Number(form.participants),
+      })
+      onBooked(booking)
     } catch (error) {
       setServerError(errorMessage(error))
     } finally {
@@ -147,12 +118,8 @@ export default function BookingDialog({ session, room, booking, initial, onClose
   return (
     <Dialog
       open
-      title={booking ? 'Modifier la réservation' : `Réserver la salle ${room?.code ?? ''}`}
-      description={
-        booking
-          ? `Changez le créneau ou la salle. Si la modification est refusée, la réservation d'origine reste inchangée. Durée maximale : ${formatDuration(maxMinutes)}.`
-          : `${room ? `${ROOM_TYPE_LABELS[room.room_type]} · ${room.building} · ${room.capacity} places. ` : ''}Durée maximale : ${formatDuration(maxMinutes)}.`
-      }
+      title={`Réserver la salle ${room.code}`}
+      description={`${ROOM_TYPE_LABELS[room.room_type]} · ${room.building} · ${room.capacity} places. Durée maximale : ${formatDuration(maxMinutes)}.`}
       onClose={onClose}
       onSubmit={handleSubmit}
       footer={
@@ -161,36 +128,12 @@ export default function BookingDialog({ session, room, booking, initial, onClose
             Annuler
           </button>
           <button type="submit" className="button-primary" disabled={busy}>
-            {booking ? (busy ? 'Enregistrement…' : 'Enregistrer') : busy ? 'Réservation…' : 'Réserver'}
+            {busy ? 'Réservation…' : 'Réserver'}
           </button>
         </>
       }
     >
       <div className="form-grid booking-form-grid">
-        {booking && (
-          <div className="field booking-room">
-            <label htmlFor="booking-room">Salle</label>
-            <select
-              id="booking-room"
-              className="select"
-              value={roomId}
-              onChange={(event) => setRoomId(Number(event.target.value))}
-              data-autofocus
-            >
-              {/* La salle actuelle reste proposée même si la liste n'est pas encore chargée */}
-              {!rooms.some((item) => item.id === booking.room.id) && (
-                <option value={booking.room.id}>
-                  {booking.room.code} · {booking.room.capacity} places
-                </option>
-              )}
-              {rooms.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.code} · {ROOM_TYPE_LABELS[item.room_type]} · {item.capacity} places
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
         <div className="field">
           <label htmlFor="booking-date">Date</label>
           <input
@@ -245,7 +188,7 @@ export default function BookingDialog({ session, room, booking, initial, onClose
             className="input"
             type="number"
             min={1}
-            max={capacity || undefined}
+            max={room.capacity}
             inputMode="numeric"
             value={form.participants}
             onChange={(event) => update('participants', event.target.value)}
@@ -274,7 +217,7 @@ export default function BookingDialog({ session, room, booking, initial, onClose
             onChange={(event) => update('purpose', event.target.value)}
             aria-invalid={!!errors.purpose}
             aria-describedby={errors.purpose ? 'booking-purpose-error' : undefined}
-            data-autofocus={booking ? undefined : true}
+            data-autofocus
           />
           {errors.purpose && (
             <p id="booking-purpose-error" className="field-error">

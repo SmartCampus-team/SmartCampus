@@ -1,9 +1,8 @@
 // Formulaire de création ou de modification d'une salle (SC-20, EF-ROOM-04).
-// SC-31 (EF-ROOM-05) : le gestionnaire coche les équipements de la salle, pris dans le catalogue.
+// Les équipements s'ajouteront avec le catalogue de SC-31 (Sprint 3).
 
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { errorMessage } from '../api/client'
-import { fetchEquipment, setRoomEquipment, sortByLabel, type Equipment } from '../api/equipment'
 import { createRoom, ROOM_TYPE_LABELS, ROOM_TYPES, updateRoom, type Room, type RoomInput, type RoomType } from '../api/rooms'
 import type { Session } from '../auth/session'
 import Dialog from '../components/Dialog'
@@ -52,19 +51,6 @@ export default function RoomFormDialog({ session, room, buildings, onClose, onSa
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
   const [serverError, setServerError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  // Équipements (SC-31) : le catalogue et ceux cochés pour cette salle
-  const [catalogue, setCatalogue] = useState<Equipment[] | null>(null)
-  const [equipment, setEquipment] = useState<number[]>(() => room?.equipment.map((item) => item.id) ?? [])
-
-  useEffect(() => {
-    fetchEquipment(session)
-      .then((list) => setCatalogue(sortByLabel(list)))
-      .catch(() => setCatalogue([]))
-  }, [session])
-
-  function toggleEquipment(id: number) {
-    setEquipment((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
-  }
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }))
@@ -87,12 +73,7 @@ export default function RoomFormDialog({ session, room, buildings, onClose, onSa
     }
     setBusy(true)
     try {
-      let saved = room ? await updateRoom(session, room.id, input) : await createRoom(session, input)
-      // Équipements enregistrés seulement s'ils ont changé
-      const before = (room?.equipment ?? []).map((item) => item.id).sort().join(',')
-      if ([...equipment].sort().join(',') !== before) {
-        saved = await setRoomEquipment(session, saved.id, equipment)
-      }
+      const saved = room ? await updateRoom(session, room.id, input) : await createRoom(session, input)
       onSaved(saved, room === null)
     } catch (error) {
       setServerError(errorMessage(error))
@@ -209,28 +190,6 @@ export default function RoomFormDialog({ session, room, buildings, onClose, onSa
           />
         </div>
       </div>
-
-      <fieldset className="chip-fieldset">
-        <legend>Équipements</legend>
-        {catalogue === null && <p className="field-hint">Chargement du catalogue…</p>}
-        {catalogue !== null && catalogue.length === 0 && (
-          <p className="field-hint">Le catalogue est vide : ajoutez des équipements depuis « Catalogue d'équipements ».</p>
-        )}
-        {catalogue !== null && catalogue.length > 0 && (
-          <div className="chip-group">
-            {catalogue.map((item) => (
-              <label key={item.id} className="chip">
-                <input
-                  type="checkbox"
-                  checked={equipment.includes(item.id)}
-                  onChange={() => toggleEquipment(item.id)}
-                />
-                {item.label}
-              </label>
-            ))}
-          </div>
-        )}
-      </fieldset>
 
       {serverError && (
         <p className="notice notice-error" role="alert">

@@ -1,7 +1,7 @@
 """Consultation des salles (SC-20, SC-21 : EF-ROOM-01) et recherche d'une salle libre
-(SC-22 : EF-ROOM-02, RG-03, RG-08, RG-10). SC-31 ajoute le filtre par équipement."""
+(SC-22 : EF-ROOM-02, RG-03, RG-08, RG-10)."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime, time
 
 from sqlalchemy import Select, and_, exists, or_, select
@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from src.config import settings
 from src.models.blocking import Blocking
 from src.models.booking import OCCUPYING_STATUSES, Booking
-from src.models.equipment import Equipment
 from src.models.room import Room, RoomStatus, RoomType
 from src.services import campus_clock
 from src.services.common import ServiceError
@@ -31,7 +30,6 @@ class RoomFilters:
     building: str | None = None
     room_type: RoomType | None = None
     min_capacity: int | None = None  # nombre de participants (RG-08)
-    equipment_ids: list[int] = field(default_factory=list)  # la salle doit avoir chacun (SC-31)
 
 
 def apply_filters(statement: Select[tuple[Room]], filters: RoomFilters) -> Select[tuple[Room]]:
@@ -44,8 +42,6 @@ def apply_filters(statement: Select[tuple[Room]], filters: RoomFilters) -> Selec
         statement = statement.where(Room.room_type == filters.room_type)
     if filters.min_capacity:
         statement = statement.where(Room.capacity >= filters.min_capacity)
-    for equipment_id in filters.equipment_ids:
-        statement = statement.where(Room.equipment.any(Equipment.id == equipment_id))
     return statement
 
 

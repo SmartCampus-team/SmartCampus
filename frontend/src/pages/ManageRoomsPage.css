@@ -7,16 +7,3 @@
 .room-form-grid {
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
 }
-
-/* SC-31 : catalogue d'équipements et colonne des équipements */
-.manage-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.cell-equipment {
-  min-width: 12rem;
-  font-size: 0.85rem;
-  color: var(--sc-muted);
-}

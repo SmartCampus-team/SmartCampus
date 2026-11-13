@@ -1,11 +1,10 @@
 /* Formulaire de réservation (SC-25) : date, horaires et participants sur une ou deux lignes,
-   motif (et salle, en modification : SC-30) sur toute la largeur ; une colonne à 360 px */
+   motif sur toute la largeur ; une colonne à 360 px */
 
 .booking-form-grid {
   grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
 }
 
-.booking-form-grid .booking-room,
 .booking-form-grid .booking-purpose,
 .booking-form-grid .booking-slot-error {
   grid-column: 1 / -1;

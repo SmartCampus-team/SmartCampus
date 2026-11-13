@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from src.api.deps import FORBIDDEN, get_current_user, require_roles
 from src.database import get_db
-from src.models.equipment import EquipmentCategory
 from src.models.room import Room, RoomStatus, RoomType
 from src.models.user import Role, User
 from src.services import room_admin_service, room_service
@@ -26,16 +25,6 @@ Db = Annotated[Session, Depends(get_db)]
 CODE_PATTERN = r"^\s*[A-Za-z0-9][A-Za-z0-9-]*\s*$"
 
 
-class EquipmentOut(BaseModel):
-    """Un équipement du catalogue (SC-31)."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    label: str
-    category: EquipmentCategory
-
-
 class RoomOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -46,7 +35,6 @@ class RoomOut(BaseModel):
     capacity: int
     status: RoomStatus
     description: str | None
-    equipment: list[EquipmentOut]  # SC-31, par ordre alphabétique
 
 
 class RoomCreate(BaseModel):
@@ -83,13 +71,8 @@ def room_filters(
     building: Annotated[str | None, Query(max_length=80)] = None,
     room_type: RoomType | None = None,
     min_capacity: Annotated[int | None, Query(ge=1, le=1000, description="Nombre de participants")] = None,
-    equipment: Annotated[
-        list[int] | None, Query(description="Équipements (identifiants) : la salle doit tous les avoir")
-    ] = None,
 ) -> RoomFilters:
-    return RoomFilters(
-        query=q, building=building, room_type=room_type, min_capacity=min_capacity, equipment_ids=equipment or []
-    )
+    return RoomFilters(query=q, building=building, room_type=room_type, min_capacity=min_capacity)
 
 
 Filters = Annotated[RoomFilters, Depends(room_filters)]
@@ -99,7 +82,7 @@ Filters = Annotated[RoomFilters, Depends(room_filters)]
 def list_rooms(user: CurrentUser, db: Db, filters: Filters, include_archived: bool = False) -> list[Room]:
     """Salles non archivées : bâtiment, type, capacité, statut (EF-ROOM-01).
 
-    Filtres facultatifs : code ou bâtiment (q), bâtiment exact, type, capacité minimale, équipements (SC-31).
+    Filtres facultatifs : code ou bâtiment (q), bâtiment exact, type, capacité minimale.
     Le gestionnaire peut aussi demander les salles archivées.
     """
     if include_archived and user.role != Role.GESTIONNAIRE:

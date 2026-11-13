@@ -1,16 +1,15 @@
 """Table rooms : référentiel des salles (SC-20 : EF-ROOM-04).
 
-Les équipements de chaque salle viennent du catalogue de SC-31 (table room_equipment).
+Les équipements arrivent avec le catalogue de SC-31 (Sprint 3).
 """
 
 import enum
 from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, Enum, Integer, String, Text, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from src.database import Base
-from src.models.equipment import Equipment, room_equipment
 
 
 class RoomType(enum.StrEnum):
@@ -54,9 +53,4 @@ class Room(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
-
-    # Équipements de la salle, par ordre alphabétique (SC-31) ; chargés avec la salle
-    equipment: Mapped[list[Equipment]] = relationship(
-        secondary=room_equipment, lazy="selectin", order_by=Equipment.label
     )

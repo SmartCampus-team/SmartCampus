@@ -1,6 +1,5 @@
 """Données de démonstration : un compte par rôle (SC-12), les salles du campus (SC-20),
-des réservations et des blocages sur les prochains jours ouvrés (SC-22), le catalogue
-d'équipements et leur affectation aux salles (SC-31).
+des réservations et des blocages sur les prochains jours ouvrés (SC-22).
 
 Usage, depuis le dossier backend :  python -m src.seed
 Le script peut être relancé : il ne recrée pas ce qui existe déjà, et ne recrée les
@@ -16,7 +15,6 @@ from src.config import settings
 from src.database import SessionLocal
 from src.models.blocking import Blocking
 from src.models.booking import Booking, BookingStatus
-from src.models.equipment import Equipment, EquipmentCategory
 from src.models.room import Room, RoomStatus, RoomType
 from src.models.user import Role, User
 from src.services import campus_clock
@@ -45,32 +43,6 @@ DEMO_ROOMS = [
     ("C-002", "Bâtiment C", RoomType.SALLE_TRAVAIL, 6, RoomStatus.ACTIVE, None),
     ("D-001", "Bâtiment D", RoomType.SALLE_COURS, 35, RoomStatus.ARCHIVEE, "Ancienne salle, remplacée par A-101."),
 ]
-
-# Catalogue d'équipements (SC-31) : (libellé, catégorie)
-DEMO_EQUIPMENT = [
-    ("Vidéoprojecteur", EquipmentCategory.AUDIOVISUEL),
-    ("Écran interactif", EquipmentCategory.AUDIOVISUEL),
-    ("Sonorisation", EquipmentCategory.AUDIOVISUEL),
-    ("Visioconférence", EquipmentCategory.AUDIOVISUEL),
-    ("Postes informatiques", EquipmentCategory.INFORMATIQUE),
-    ("Prises réseau", EquipmentCategory.INFORMATIQUE),
-    ("Tableau blanc", EquipmentCategory.MOBILIER),
-    ("Tables modulables", EquipmentCategory.MOBILIER),
-    ("Climatisation", EquipmentCategory.CONFORT),
-    ("Accès PMR", EquipmentCategory.ACCESSIBILITE),
-]
-
-# Équipements de chaque salle (SC-31)
-DEMO_ROOM_EQUIPMENT = {
-    "AMPHI-A": ["Vidéoprojecteur", "Sonorisation", "Visioconférence", "Climatisation", "Accès PMR"],
-    "A-101": ["Vidéoprojecteur", "Tableau blanc", "Climatisation", "Accès PMR"],
-    "A-102": ["Vidéoprojecteur", "Tableau blanc"],
-    "A-103": ["Tableau blanc"],
-    "B-201": ["Postes informatiques", "Prises réseau", "Vidéoprojecteur", "Climatisation"],
-    "B-202": ["Prises réseau", "Tableau blanc"],
-    "C-001": ["Écran interactif", "Tables modulables", "Tableau blanc"],
-    "C-002": ["Tables modulables", "Tableau blanc"],
-}
 
 # (jour ouvré à venir : 0 = le prochain, salle, titulaire, début, fin, motif, participants, statut)
 DEMO_BOOKINGS = [
@@ -138,26 +110,6 @@ def seed_rooms(db: Session) -> None:
     db.flush()
 
 
-def seed_equipment(db: Session) -> None:
-    """Crée les équipements manquants et les ajoute aux salles qui ne les ont pas encore (SC-31)."""
-    catalogue = {equipment.label: equipment for equipment in db.scalars(select(Equipment))}
-    for label, category in DEMO_EQUIPMENT:
-        if label not in catalogue:
-            catalogue[label] = Equipment(label=label, category=category)
-            db.add(catalogue[label])
-            print(f"créé          : équipement {label}")
-    db.flush()
-
-    added = 0
-    for room in db.scalars(select(Room).where(Room.code.in_(DEMO_ROOM_EQUIPMENT))):
-        for label in DEMO_ROOM_EQUIPMENT[room.code]:
-            if catalogue[label] not in room.equipment:
-                room.equipment.append(catalogue[label])
-                added += 1
-    print(f"affectés      : {added} équipements aux salles" if added else "équipements des salles déjà affectés")
-    db.flush()
-
-
 def seed_bookings(db: Session) -> None:
     now = campus_clock.now()
     upcoming = db.scalar(select(Booking.id).where(Booking.start_at >= now).limit(1))
@@ -210,7 +162,6 @@ def main() -> None:
     with SessionLocal() as db:
         seed_accounts(db)
         seed_rooms(db)
-        seed_equipment(db)
         seed_bookings(db)
         db.commit()
     print("Mot de passe des comptes : valeur SEED_PASSWORD de backend/.env")

@@ -1,14 +1,12 @@
 // Salles : la liste des salles du campus (SC-21, EF-ROOM-01) et la recherche d'une salle libre
 // sur un créneau (SC-22, EF-ROOM-02), avec un lien vers le planning de chaque salle (SC-23).
-// SC-25 : chaque salle libre trouvée se réserve sur le créneau cherché (EF-BOOK-01) ; SC-28 : lien vers « Mes réservations ».
-// SC-31 : chaque salle affiche ses équipements, et la recherche filtre par équipement (EF-ROOM-05).
+// SC-25 : chaque salle libre trouvée se réserve sur le créneau cherché (EF-BOOK-01).
 // Les critères de recherche sont dans l'URL :
-// #/salles?date=2026-11-02&debut=10:00&fin=12:00&participants=20&equipements=1,3
+// #/salles?date=2026-11-02&debut=10:00&fin=12:00&participants=20
 
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { canBook, type Booking } from '../api/bookings'
 import { errorMessage } from '../api/client'
-import { fetchEquipment, sortByLabel, type Equipment } from '../api/equipment'
 import {
   fetchRooms,
   ROOM_STATUS_LABELS,
@@ -50,7 +48,6 @@ interface Criteria {
   participants: string
   type: RoomType | ''
   building: string
-  equipment: number[] // SC-31
 }
 
 const START_OPTIONS = timeOptions(OPENING, '19:30')
@@ -63,10 +60,6 @@ function criteriaFromQuery(query: URLSearchParams): { criteria: Criteria; search
   const end = query.get('fin')
   const searched = isValidIsoDate(date) && !!start && !!end
   const type = query.get('type')
-  const equipment = (query.get('equipements') ?? '')
-    .split(',')
-    .map(Number)
-    .filter((id) => Number.isInteger(id) && id > 0)
   return {
     searched,
     criteria: {
@@ -76,7 +69,6 @@ function criteriaFromQuery(query: URLSearchParams): { criteria: Criteria; search
       participants: query.get('participants') ?? '',
       type: ROOM_TYPES.includes(type as RoomType) ? (type as RoomType) : '',
       building: query.get('batiment') ?? '',
-      equipment,
     },
   }
 }
@@ -89,7 +81,6 @@ function criteriaToPath(criteria: Criteria): string {
     participants: criteria.participants,
     type: criteria.type,
     batiment: criteria.building,
-    equipements: criteria.equipment.join(','),
   })
 }
 
@@ -131,17 +122,8 @@ export function RoomCard({ room, planningTo, action }: { room: Room; planningTo?
           {room.capacity} places
         </li>
       </ul>
-      {room.equipment.length > 0 ? (
-        <ul className="tag-list room-equipment-list" aria-label="Équipements">
-          {room.equipment.map((item) => (
-            <li key={item.id} className="tag">
-              {item.label}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="room-equipment">Équipements : aucun renseigné</p>
-      )}
+      {/* Le catalogue d'équipements arrive avec SC-31 (Sprint 3) */}
+      <p className="room-equipment">Équipements : aucun renseigné</p>
       {room.description && <p className="room-description">{room.description}</p>}
       {(planningTo || action) && (
         <div className="room-card-foot">
@@ -165,7 +147,6 @@ export default function RoomsPage({ session, location }: Props) {
   const [searching, setSearching] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [buildings, setBuildings] = useState<string[]>([])
-  const [catalogue, setCatalogue] = useState<Equipment[]>([])
   // Réservation depuis les résultats (SC-25) : salle choisie, confirmation, recherche relancée ensuite
   const [booking, setBooking] = useState<Room | null>(null)
   const [confirmation, setConfirmation] = useState<Booking | null>(null)
@@ -188,13 +169,6 @@ export default function RoomsPage({ session, location }: Props) {
       .catch(() => setBuildings([]))
   }, [session])
 
-  // Équipements proposés comme filtre (SC-31)
-  useEffect(() => {
-    fetchEquipment(session)
-      .then((list) => setCatalogue(sortByLabel(list)))
-      .catch(() => setCatalogue([]))
-  }, [session])
-
   // Recherche lancée par l'URL ; les erreurs de l'API (créneau refusé) s'affichent sous le formulaire
   useEffect(() => {
     if (!searched) {
@@ -211,7 +185,6 @@ export default function RoomsPage({ session, location }: Props) {
       min_capacity: initial.participants ? Number(initial.participants) : null,
       room_type: initial.type,
       building: initial.building,
-      equipment: initial.equipment,
     })
       .then((availability) => active && setResult(availability))
       .catch((err) => {
@@ -249,18 +222,6 @@ export default function RoomsPage({ session, location }: Props) {
   function update<K extends keyof Criteria>(key: K, value: Criteria[K]) {
     setCriteria((current) => ({ ...current, [key]: value }))
   }
-
-  function toggleEquipment(id: number) {
-    setCriteria((current) => ({
-      ...current,
-      equipment: current.equipment.includes(id)
-        ? current.equipment.filter((item) => item !== id)
-        : [...current.equipment, id],
-    }))
-  }
-
-  // Libellés des équipements cherchés, pour le résumé des résultats
-  const wanted = catalogue.filter((item) => initial.equipment.includes(item.id)).map((item) => item.label)
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -402,24 +363,6 @@ export default function RoomsPage({ session, location }: Props) {
           </div>
         </div>
 
-        {catalogue.length > 0 && (
-          <fieldset className="chip-fieldset">
-            <legend>Équipements</legend>
-            <div className="chip-group">
-              {catalogue.map((item) => (
-                <label key={item.id} className="chip">
-                  <input
-                    type="checkbox"
-                    checked={criteria.equipment.includes(item.id)}
-                    onChange={() => toggleEquipment(item.id)}
-                  />
-                  {item.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        )}
-
         {formError && (
           <p className="notice notice-error" role="alert">
             {formError}
@@ -448,8 +391,8 @@ export default function RoomsPage({ session, location }: Props) {
               </h2>
               <p>
                 {formatLongDate(initial.date)} · {initial.start} – {initial.end}
-                {initial.participants ? ` · ${initial.participants} participants` : ''}
-                {wanted.length > 0 ? ` · avec ${wanted.join(', ')}` : ''} · la plus petite salle adaptée d'abord
+                {initial.participants ? ` · ${initial.participants} participants` : ''} · la plus petite salle adaptée
+                d'abord
               </p>
             </div>
             <button type="button" className="button-link" onClick={handleReset}>
@@ -462,7 +405,7 @@ export default function RoomsPage({ session, location }: Props) {
               <span>
                 Réservation confirmée : salle {confirmation.room.code}, {formatLongDate(confirmation.date)},{' '}
                 {shortTime(confirmation.start)} – {shortTime(confirmation.end)}.{' '}
-                <Link to="/reservations">Voir mes réservations</Link>
+                <Link to={planningPath(confirmation.room.id, { date: confirmation.date })}>Voir le planning</Link>
               </span>
             </p>
           )}

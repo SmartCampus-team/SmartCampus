@@ -198,8 +198,3 @@
   font-weight: 600;
   color: inherit;
 }
-
-/* Équipements de la salle (SC-31) */
-.room-equipment-list .tag {
-  font-size: 0.75rem;
-}

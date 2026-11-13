@@ -1,15 +1,14 @@
 """Table bookings : réservations des salles (SC-22).
 
-Le Sprint 2 lit les réservations pour la recherche et le planning ; SC-25 les crée.
-SC-27 : une contrainte d'exclusion PostgreSQL interdit deux réservations qui occupent la même
-salle sur des créneaux qui se chevauchent (RG-01), même si les deux demandes arrivent en même temps.
+Le Sprint 2 ne fait que lire les réservations, pour exclure les créneaux occupés de la
+recherche et les afficher dans le planning. SC-25 (Sprint 3) ajoutera leur création,
+SC-27 la contrainte d'exclusion qui interdit les chevauchements (RG-01).
 """
 
 import enum
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Integer, String, func, text
-from sqlalchemy.dialects.postgresql import ExcludeConstraint
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
@@ -39,16 +38,6 @@ class Booking(Base):
         CheckConstraint("end_at > start_at", name="ck_bookings_end_after_start"),
         CheckConstraint("participants > 0", name="ck_bookings_participants_positive"),
         Index("ix_bookings_room_start", "room_id", "start_at"),
-        # RG-01 (SC-27) : même salle et périodes [début, fin) qui se chevauchent → refusé par PostgreSQL.
-        # 10:00-12:00 et 12:00-13:00 ne se chevauchent pas. Seuls les statuts qui occupent la salle comptent.
-        # L'index GiST sur room_id demande l'extension btree_gist (migration 0008).
-        ExcludeConstraint(
-            ("room_id", "="),
-            (text("tstzrange(start_at, end_at)"), "&&"),
-            name="ex_bookings_no_overlap",
-            using="gist",
-            where=text("status IN ('en_attente', 'confirmee')"),
-        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -71,9 +60,6 @@ class Booking(Base):
         default=BookingStatus.CONFIRMEE,
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    # Annulation (SC-29) : la réservation reste en base avec sa date et son motif d'annulation
-    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    cancel_reason: Mapped[str | None] = mapped_column(String(200))
 
     room: Mapped[Room] = relationship()
     holder: Mapped[User] = relationship()
