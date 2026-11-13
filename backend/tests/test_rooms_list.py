@@ -31,6 +31,7 @@ def test_each_room_shows_building_type_capacity_and_status(client, db, headers):
         "capacity": 40,
         "status": "active",
         "description": "Près du hall",
+        "equipment": [],  # aucun équipement affecté (SC-31)
     }
 
 
