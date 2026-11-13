@@ -5,14 +5,23 @@
 // SC-25 : l'étudiant et l'enseignant réservent la salle depuis son planning (EF-BOOK-01).
 // SC-28 : on y revient aussi depuis « Mes réservations ».
 // SC-29 : le gestionnaire annule une réservation en cliquant dessus (EF-BOOK-04, à tout moment).
+// SC-32 : le gestionnaire bloque la salle sur une période depuis son planning (EF-ROOM-06).
 
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import type { BlockingCreated } from '../api/blockings'
 import { canBook, type Booking } from '../api/bookings'
 import { ApiError, errorMessage } from '../api/client'
 import { fetchPlanning, type Planning, type PlanningEntry, type PlanningView } from '../api/planning'
 import { ROOM_STATUS_LABELS, ROOM_TYPE_LABELS } from '../api/rooms'
 import type { Session } from '../auth/session'
-import { CalendarCheckIcon, ChevronLeftIcon, ChevronRightIcon, MapPinIcon, UsersIcon } from '../components/icons'
+import {
+  CalendarCheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  LockIcon,
+  MapPinIcon,
+  UsersIcon,
+} from '../components/icons'
 import {
   addDays,
   defaultSlot,
@@ -28,6 +37,7 @@ import {
   toMinutes,
 } from '../dates'
 import { Link, navigate, withQuery, type Location } from '../router'
+import BlockingDialog, { formatMoment } from './BlockingDialog'
 import BookingDialog, { type BookingDraft } from './BookingDialog'
 import CancelBookingDialog from './CancelBookingDialog'
 import StatusPage from './StatusPage'
@@ -116,6 +126,7 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
   const [cancelling, setCancelling] = useState<PlanningEntry | null>(null)
   const [cancelMessage, setCancelMessage] = useState<string | null>(null)
   const isManager = session.user.role === 'gestionnaire'
+  const [blockingOpen, setBlockingOpen] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -171,6 +182,17 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
     setCancelMessage(
       `Réservation annulée : ${formatLongDate(booking.date)}, ${shortTime(booking.start)} – ${shortTime(booking.end)}. ` +
         'Le créneau est de nouveau libre.',
+    )
+    setReloadKey((key) => key + 1)
+  }
+
+  function handleBlocked(created: BlockingCreated) {
+    setBlockingOpen(false)
+    const count = created.cancelled_bookings
+    setCancelMessage(
+      `Salle bloquée du ${formatMoment(created.start_date, created.start_time)} au ` +
+        `${formatMoment(created.end_date, created.end_time)} : ${created.reason}. ` +
+        (count === 0 ? 'Aucune réservation à annuler.' : `${count} réservation${count > 1 ? 's' : ''} annulée${count > 1 ? 's' : ''}.`),
     )
     setReloadKey((key) => key + 1)
   }
@@ -231,6 +253,19 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
           >
             <CalendarCheckIcon />
             Réserver un créneau
+          </button>
+        )}
+        {isManager && room && room.status !== 'archivee' && (
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={() => {
+              setCancelMessage(null)
+              setBlockingOpen(true)
+            }}
+          >
+            <LockIcon />
+            Bloquer la salle
           </button>
         )}
         {bookable && room.room_type === 'amphitheatre' && (
@@ -441,6 +476,17 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
         )}
         {loading && !planning && <p className="loading">Chargement du planning…</p>}
       </section>
+
+      {blockingOpen && room && (
+        <BlockingDialog
+          session={session}
+          room={room}
+          initialDate={date < today ? today : date}
+          onClose={() => setBlockingOpen(false)}
+          onBlocked={handleBlocked}
+          onChanged={() => setReloadKey((key) => key + 1)}
+        />
+      )}
 
       {cancelling && room && (
         <CancelBookingDialog
