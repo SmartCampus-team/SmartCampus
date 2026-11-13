@@ -9,7 +9,7 @@ Les valeurs 7, 30, 4 et 8 sont lues dans la table settings, jamais écrites dans
 
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, true
 from sqlalchemy.orm import Session
 
 from src.models.booking import OCCUPYING_STATUSES, Booking, BookingStatus
@@ -45,17 +45,28 @@ def week_bounds(day: date) -> tuple[datetime, datetime]:
     return campus_clock.at(monday, time(0)), campus_clock.at(monday + timedelta(days=7), time(0))
 
 
-def check_quotas(db: Session, user: User, start_at: datetime, end_at: datetime, now: datetime | None = None) -> None:
-    """Quotas d'un étudiant (RG-07) ; l'enseignant n'en a pas."""
+def check_quotas(
+    db: Session,
+    user: User,
+    start_at: datetime,
+    end_at: datetime,
+    now: datetime | None = None,
+    exclude_id: int | None = None,
+) -> None:
+    """Quotas d'un étudiant (RG-07) ; l'enseignant n'en a pas.
+
+    exclude_id : la réservation que l'on modifie ne compte pas deux fois (SC-30).
+    """
     if user.role != Role.ETUDIANT:
         return
     now = now or campus_clock.now()
+    others = Booking.id != exclude_id if exclude_id is not None else true()
 
     limit = setting_service.get_int(db, SettingKey.MAX_UPCOMING_BOOKINGS_STUDENT)
     upcoming = db.scalar(
         select(func.count())
         .select_from(Booking)
-        .where(Booking.holder_id == user.id, Booking.status.in_(OCCUPYING_STATUSES), Booking.start_at > now)
+        .where(Booking.holder_id == user.id, Booking.status.in_(OCCUPYING_STATUSES), Booking.start_at > now, others)
     )
     if upcoming >= limit:
         raise ServiceError(400, UPCOMING_QUOTA.format(limit=limit))
@@ -68,6 +79,7 @@ def check_quotas(db: Session, user: User, start_at: datetime, end_at: datetime, 
             Booking.status.in_(WEEKLY_STATUSES),
             Booking.start_at >= week_start,
             Booking.start_at < week_end,
+            others,
         )
     )
     total = sum((booking.end_at - booking.start_at for booking in booked), timedelta()) + (end_at - start_at)

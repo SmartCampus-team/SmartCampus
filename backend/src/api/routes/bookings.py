@@ -1,5 +1,5 @@
-"""Réservations des salles (SC-25 : EF-BOOK-01), « Mes réservations » (SC-28 : EF-BOOK-03)
-et annulation (SC-29 : EF-BOOK-04, RG-05)."""
+"""Réservations des salles (SC-25 : EF-BOOK-01), « Mes réservations » (SC-28 : EF-BOOK-03),
+annulation (SC-29 : EF-BOOK-04, RG-05) et modification (SC-30 : EF-BOOK-05)."""
 
 from datetime import date as Date
 from datetime import datetime, time
@@ -16,7 +16,7 @@ from src.models.booking import Booking, BookingStatus
 from src.models.room import RoomType
 from src.models.user import Role, User
 from src.services import booking_service, campus_clock
-from src.services.booking_service import BOOKING_ROLES, CancelRules
+from src.services.booking_service import BOOKING_ROLES, BookingChanges, CancelRules
 
 router = APIRouter(prefix="/api/bookings", tags=["bookings"])
 
@@ -35,6 +35,17 @@ class BookingCreate(BaseModel):
     end: time = Field(description="Fin, HH:MM")
     purpose: Purpose = Field(examples=["Révision en groupe"])
     participants: int = Field(ge=1, le=1000)
+
+
+class BookingUpdate(BaseModel):
+    """Seuls les champs envoyés changent (SC-30)."""
+
+    room_id: int | None = None
+    date: Date | None = None
+    start: time | None = None
+    end: time | None = None
+    purpose: Purpose | None = None
+    participants: int | None = Field(default=None, ge=1, le=1000)
 
 
 class BookingRoomOut(BaseModel):
@@ -64,6 +75,8 @@ class BookingOut(BaseModel):
     cancel_refusal: str | None
     cancelled_at: datetime | None
     cancel_reason: str | None
+    # Modification (SC-30) : réservation non commencée, par son titulaire
+    can_edit: bool
 
 
 class BookingCancel(BaseModel):
@@ -87,6 +100,7 @@ def booking_out(booking: Booking, rules: CancelRules) -> BookingOut:
         cancel_refusal=refusal.message if refusal else None,
         cancelled_at=booking.cancelled_at,
         cancel_reason=booking.cancel_reason,
+        can_edit=booking_service.can_edit(booking, rules.user, rules.now),
     )
 
 
@@ -138,4 +152,24 @@ def cancel_booking(
     """
     reason = body.reason if body else None
     booking = booking_service.cancel_booking(db, user, booking_id, reason, client_ip(request))
+    return booking_out(booking, booking_service.cancel_rules(db, user))
+
+
+@router.patch("/{booking_id}", response_model=BookingOut)
+def update_booking(booking_id: int, body: BookingUpdate, request: Request, user: Booker, db: Db) -> BookingOut:
+    """Modifie une réservation non commencée : autre créneau, autre salle, motif ou participants.
+
+    Mêmes contrôles qu'à la création (grille, durée, horizon, quotas, capacité, chevauchements) ;
+    si l'un refuse, la réservation d'origine reste intacte. L'ancien et le nouveau créneau sont journalisés.
+    409 : réservation commencée, annulée ou créneau pris ; 404 : réservation d'un autre utilisateur.
+    """
+    changes = BookingChanges(
+        room_id=body.room_id,
+        day=body.date,
+        start=body.start,
+        end=body.end,
+        purpose=body.purpose,
+        participants=body.participants,
+    )
+    booking = booking_service.update_booking(db, user, booking_id, changes, client_ip(request))
     return booking_out(booking, booking_service.cancel_rules(db, user))
