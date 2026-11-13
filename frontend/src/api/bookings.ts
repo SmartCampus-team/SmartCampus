@@ -1,5 +1,5 @@
 // Réservations des salles (SC-25, EF-BOOK-01), « Mes réservations » (SC-28, EF-BOOK-03)
-// et annulation (SC-29, EF-BOOK-04).
+// annulation (SC-29, EF-BOOK-04) et modification (SC-30, EF-BOOK-05).
 
 import type { Role, Session } from '../auth/session'
 import { apiJson } from './client'
@@ -39,6 +39,8 @@ export interface Booking {
   cancel_refusal: string | null
   cancelled_at: string | null
   cancel_reason: string | null
+  // Modification (SC-30) : réservation non commencée, par son titulaire
+  can_edit: boolean
 }
 
 export interface BookingInput {
@@ -77,4 +79,9 @@ export function fetchMyBookings(session: Session): Promise<MyBookings> {
 /** Annule une réservation (SC-29) ; le motif est facultatif (gestionnaire). */
 export function cancelBooking(session: Session, id: number, reason?: string): Promise<Booking> {
   return apiJson<Booking>(session, `/api/bookings/${id}/cancel`, 'POST', reason ? { reason } : undefined)
+}
+
+/** Modifie une réservation non commencée (SC-30) : seuls les champs envoyés changent. */
+export function updateBooking(session: Session, id: number, changes: Partial<BookingInput>): Promise<Booking> {
+  return apiJson<Booking>(session, `/api/bookings/${id}`, 'PATCH', changes)
 }

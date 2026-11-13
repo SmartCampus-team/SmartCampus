@@ -1,15 +1,26 @@
 // « Mes réservations » (SC-28, EF-BOOK-03) : à venir, passées et annulées, en trois onglets.
 // Chacun ne voit que ses propres réservations : l'API ne renvoie que celles de l'utilisateur connecté.
 // SC-29 : bouton « Annuler » (avec confirmation), désactivé moins de 2 h avant le début, raison affichée.
+// SC-30 : bouton « Modifier » tant que la réservation n'a pas commencé (autre créneau, autre salle).
 // Adresse : #/reservations, #/reservations?onglet=passees
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { BOOKING_STATUS_LABELS, fetchMyBookings, type Booking, type BookingStatus, type MyBookings } from '../api/bookings'
 import { errorMessage } from '../api/client'
 import type { Session } from '../auth/session'
-import { CalendarIcon, CalendarCheckIcon, ClockIcon, CloseIcon, MapPinIcon, SearchIcon, UsersIcon } from '../components/icons'
+import {
+  CalendarCheckIcon,
+  CalendarIcon,
+  ClockIcon,
+  CloseIcon,
+  MapPinIcon,
+  PencilIcon,
+  SearchIcon,
+  UsersIcon,
+} from '../components/icons'
 import { formatLongDate, parseIsoDate, shortTime } from '../dates'
 import { Link, navigate, withQuery, type Location } from '../router'
+import BookingDialog from './BookingDialog'
 import CancelBookingDialog from './CancelBookingDialog'
 import { planningPath } from './RoomPlanningPage'
 import './MyBookingsPage.css'
@@ -100,6 +111,7 @@ export default function MyBookingsPage({ session, location }: Props) {
   const [bookings, setBookings] = useState<MyBookings | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState<Booking | null>(null)
+  const [editing, setEditing] = useState<Booking | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const tabRefs = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({})
 
@@ -125,10 +137,33 @@ export default function MyBookingsPage({ session, location }: Props) {
     load()
   }
 
-  /** Bouton « Annuler » d'une réservation à venir ; désactivé avec la raison donnée par l'API (RG-05). */
-  function cancelAction(booking: Booking) {
+  function handleEdited(booking: Booking) {
+    setEditing(null)
+    setMessage(
+      `Réservation modifiée : salle ${booking.room.code}, ${formatLongDate(booking.date)}, ` +
+        `${shortTime(booking.start)} – ${shortTime(booking.end)}.`,
+    )
+    load()
+  }
+
+  /** Boutons d'une réservation à venir : « Modifier » (SC-30) et « Annuler », désactivé avec la raison
+   * donnée par l'API (RG-05). */
+  function upcomingActions(booking: Booking) {
     return (
       <>
+        {booking.can_edit && (
+          <button
+            type="button"
+            className="button-secondary booking-edit"
+            onClick={() => {
+              setMessage(null)
+              setEditing(booking)
+            }}
+          >
+            <PencilIcon />
+            Modifier
+          </button>
+        )}
         <button
           type="button"
           className="button-secondary booking-cancel"
@@ -240,12 +275,16 @@ export default function MyBookingsPage({ session, location }: Props) {
           <ul className="booking-list">
             {list.map((booking) => (
               <BookingItem key={booking.id} booking={booking} back={back}>
-                {tab === 'upcoming' && cancelAction(booking)}
+                {tab === 'upcoming' && upcomingActions(booking)}
               </BookingItem>
             ))}
           </ul>
         )}
       </section>
+
+      {editing && (
+        <BookingDialog session={session} booking={editing} onClose={() => setEditing(null)} onBooked={handleEdited} />
+      )}
 
       {cancelling && (
         <CancelBookingDialog
