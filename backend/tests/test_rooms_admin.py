@@ -56,6 +56,7 @@ def test_manager_creates_an_active_room(client, db, manager):
         "capacity": 30,
         "status": "active",
         "description": "Près de l'escalier",
+        "equipment": [],  # affectés depuis le catalogue (SC-31)
     }
     # Elle apparaît dans la liste avec le statut « active »
     assert codes(client.get(URL, headers=manager)) == ["A-104"]
