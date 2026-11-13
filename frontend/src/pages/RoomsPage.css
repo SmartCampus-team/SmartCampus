@@ -135,14 +135,22 @@
   color: var(--sc-muted);
 }
 
-/* Lien vers le planning de la salle (SC-23) */
+/* Pied de carte : lien vers le planning (SC-23) et bouton « Réserver » (SC-25) */
+.room-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--sc-line-soft);
+}
+
 .room-card-link {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  margin-top: auto;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--sc-line-soft);
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--sc-blue);
@@ -163,4 +171,30 @@
   .room-card-link svg {
     transition: none;
   }
+}
+
+/* Réserver une salle libre (SC-25) */
+.room-card-book {
+  min-height: 2.25rem;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.875rem;
+}
+
+.room-card-book svg {
+  width: 16px;
+  height: 16px;
+}
+
+.room-card-note {
+  font-size: 0.8rem;
+  color: var(--sc-muted);
+}
+
+.booking-confirmation {
+  margin: 0 0 1rem;
+}
+
+.booking-confirmation a {
+  font-weight: 600;
+  color: inherit;
 }

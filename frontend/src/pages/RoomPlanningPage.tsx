@@ -2,26 +2,31 @@
 // de 30 min de 08:00 à 20:00, ou vue semaine du lundi au samedi. Chaque créneau occupé porte un
 // libellé (Réservé, En attente de validation, Bloqué), pas seulement une couleur.
 // Adresse : #/salles/3?date=2026-11-02&vue=semaine
+// SC-25 : l'étudiant et l'enseignant réservent la salle depuis son planning (EF-BOOK-01).
 
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { canBook, type Booking } from '../api/bookings'
 import { ApiError, errorMessage } from '../api/client'
 import { fetchPlanning, type Planning, type PlanningEntry, type PlanningView } from '../api/planning'
 import { ROOM_STATUS_LABELS, ROOM_TYPE_LABELS } from '../api/rooms'
 import type { Session } from '../auth/session'
-import { ChevronLeftIcon, ChevronRightIcon, MapPinIcon, UsersIcon } from '../components/icons'
+import { CalendarCheckIcon, ChevronLeftIcon, ChevronRightIcon, MapPinIcon, UsersIcon } from '../components/icons'
 import {
   addDays,
+  defaultSlot,
   formatLongDate,
   formatShortDay,
   fromMinutes,
   isoDate,
   isOpenDay,
   isValidIsoDate,
+  nextOpenDay,
   parseIsoDate,
   shortTime,
   toMinutes,
 } from '../dates'
 import { Link, navigate, withQuery, type Location } from '../router'
+import BookingDialog, { type BookingDraft } from './BookingDialog'
 import StatusPage from './StatusPage'
 import './RoomPlanningPage.css'
 
@@ -59,6 +64,12 @@ function stepDay(date: string, direction: 1 | -1): string {
   return isOpenDay(next) ? next : addDays(next, direction)
 }
 
+/** Créneau proposé à l'ouverture du formulaire : le jour affiché s'il est à venir, sinon le prochain créneau libre. */
+function draftFor(date: string, today: string): BookingDraft {
+  if (date <= today) return defaultSlot()
+  return { date: nextOpenDay(date), start: '10:00', end: '11:00' }
+}
+
 function entryClass(entry: PlanningEntry): string {
   const classes = ['planning-entry']
   if (entry.kind === 'blocage') classes.push('is-blocage')
@@ -87,6 +98,10 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [loading, setLoading] = useState(true)
+  // Réservation depuis le planning (SC-25)
+  const [bookingOpen, setBookingOpen] = useState(false)
+  const [confirmation, setConfirmation] = useState<Booking | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -103,7 +118,7 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
     return () => {
       active = false
     }
-  }, [session, roomId, date, view])
+  }, [session, roomId, date, view, reloadKey])
 
   function go(nextDate: string, nextView: PlanningView = view) {
     navigate(withQuery(`/salles/${roomId}`, { date: nextDate, vue: VIEW_PARAM[nextView], retour: back }), {
@@ -125,6 +140,14 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
 
   const room = planning?.room
   const days = planning?.days ?? []
+  const bookable = !!room && canBook(session.user.role) && room.status === 'active'
+
+  function handleBooked(created: Booking) {
+    setBookingOpen(false)
+    setConfirmation(created)
+    if (created.date !== date) go(created.date)
+    setReloadKey((key) => key + 1)
+  }
   const title = days.length === 0 ? '' : view === 'week' ? weekTitle(days) : formatLongDate(days[0])
 
   function rowOf(time: string): number {
@@ -160,7 +183,32 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
             </ul>
           )}
         </div>
+        {bookable && room.room_type !== 'amphitheatre' && (
+          <button
+            type="button"
+            className="button-primary"
+            onClick={() => {
+              setConfirmation(null)
+              setBookingOpen(true)
+            }}
+          >
+            <CalendarCheckIcon />
+            Réserver un créneau
+          </button>
+        )}
+        {bookable && room.room_type === 'amphitheatre' && (
+          <p className="planning-book-note">Un amphithéâtre se réserve sur demande validée par le gestionnaire des salles.</p>
+        )}
       </header>
+
+      {confirmation && (
+        <p className="notice notice-success planning-status" role="status">
+          <span>
+            Réservation confirmée : {formatLongDate(confirmation.date)}, {shortTime(confirmation.start)} –{' '}
+            {shortTime(confirmation.end)}, « {confirmation.purpose} ».
+          </span>
+        </p>
+      )}
 
       {room && room.status !== 'active' && (
         <p className="notice notice-info planning-status" role="status">
@@ -325,6 +373,16 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
         )}
         {loading && !planning && <p className="loading">Chargement du planning…</p>}
       </section>
+
+      {bookingOpen && room && (
+        <BookingDialog
+          session={session}
+          room={room}
+          initial={draftFor(date, today)}
+          onClose={() => setBookingOpen(false)}
+          onBooked={handleBooked}
+        />
+      )}
     </>
   )
 }

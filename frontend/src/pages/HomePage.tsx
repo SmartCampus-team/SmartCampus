@@ -1,4 +1,4 @@
-// Accueil de SmartCampus (SC-11, SC-17) : la barre du haut est dans AppLayout ;
+// Accueil de SmartCampus (SC-11, SC-17, SC-25) : la barre du haut est dans AppLayout ;
 // chaque service devient un lien quand son écran est livré.
 
 import type { ComponentType } from 'react'
@@ -39,7 +39,7 @@ const SERVICES: Service[] = [
     title: 'Réservation de salle',
     description: 'Réservez une salle en quelques clics pour vos cours, réunions ou événements.',
     Icon: CalendarCheckIcon,
-    sprint: 3,
+    to: '/salles', // SC-25 : on réserve une salle libre trouvée par la recherche ou depuis son planning
   },
   {
     title: 'Démarches administratives',
