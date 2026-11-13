@@ -1,7 +1,7 @@
 """Table blockings : salles bloquées sur une période (examen, maintenance, événement) (SC-22).
 
-Le Sprint 2 lit les blocages pour la recherche et le planning ; SC-32 (Sprint 3) ajoutera
-leur création par le gestionnaire. Une salle bloquée ne peut pas être réservée (RG-10).
+Le Sprint 2 lit les blocages pour la recherche et le planning ; SC-32 les crée et les lève
+(gestionnaire). Une salle bloquée ne peut pas être réservée (RG-10).
 """
 
 from datetime import datetime
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
 from src.models.room import Room
+from src.models.user import User
 
 
 class Blocking(Base):
@@ -30,3 +31,4 @@ class Blocking(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     room: Mapped[Room] = relationship()
+    author: Mapped[User | None] = relationship()  # gestionnaire qui a posé le blocage (SC-32)
