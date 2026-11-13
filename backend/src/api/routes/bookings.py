@@ -1,4 +1,5 @@
-"""Réservations des salles (SC-25 : EF-BOOK-01) et « Mes réservations » (SC-28 : EF-BOOK-03)."""
+"""Réservations des salles (SC-25 : EF-BOOK-01), « Mes réservations » (SC-28 : EF-BOOK-03)
+et annulation (SC-29 : EF-BOOK-04, RG-05)."""
 
 from datetime import date as Date
 from datetime import datetime, time
@@ -13,13 +14,15 @@ from src.api.routes.rooms import client_ip
 from src.database import get_db
 from src.models.booking import Booking, BookingStatus
 from src.models.room import RoomType
-from src.models.user import User
+from src.models.user import Role, User
 from src.services import booking_service, campus_clock
-from src.services.booking_service import BOOKING_ROLES
+from src.services.booking_service import BOOKING_ROLES, CancelRules
 
 router = APIRouter(prefix="/api/bookings", tags=["bookings"])
 
 Booker = Annotated[User, Depends(require_roles(*BOOKING_ROLES))]
+# Le titulaire annule sa réservation ; le gestionnaire annule n'importe laquelle (SC-29)
+Canceller = Annotated[User, Depends(require_roles(*BOOKING_ROLES, Role.GESTIONNAIRE))]
 Db = Annotated[Session, Depends(get_db)]
 
 Purpose = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=200)]
@@ -56,10 +59,20 @@ class BookingOut(BaseModel):
     participants: int
     status: BookingStatus
     created_at: datetime
+    # Annulation (SC-29) : bouton actif ou non, et pourquoi ; date et motif une fois annulée
+    can_cancel: bool
+    cancel_refusal: str | None
+    cancelled_at: datetime | None
+    cancel_reason: str | None
 
 
-def booking_out(booking: Booking) -> BookingOut:
+class BookingCancel(BaseModel):
+    reason: str | None = Field(default=None, max_length=200, description="Motif, facultatif")
+
+
+def booking_out(booking: Booking, rules: CancelRules) -> BookingOut:
     start, end = campus_clock.local(booking.start_at), campus_clock.local(booking.end_at)
+    refusal = rules.refusal(booking)
     return BookingOut(
         id=booking.id,
         room=BookingRoomOut.model_validate(booking.room),
@@ -70,6 +83,10 @@ def booking_out(booking: Booking) -> BookingOut:
         participants=booking.participants,
         status=booking.status,
         created_at=booking.created_at,
+        can_cancel=refusal is None,
+        cancel_refusal=refusal.message if refusal else None,
+        cancelled_at=booking.cancelled_at,
+        cancel_reason=booking.cancel_reason,
     )
 
 
@@ -87,11 +104,12 @@ def my_bookings(user: Booker, db: Db) -> MyBookingsOut:
 
     Seules les réservations de l'utilisateur connecté sont renvoyées (RG-12).
     """
-    mine = booking_service.list_mine(db, user)
+    rules = booking_service.cancel_rules(db, user)
+    mine = booking_service.list_mine(db, user, rules.now)
     return MyBookingsOut(
-        upcoming=[booking_out(booking) for booking in mine.upcoming],
-        past=[booking_out(booking) for booking in mine.past],
-        cancelled=[booking_out(booking) for booking in mine.cancelled],
+        upcoming=[booking_out(booking, rules) for booking in mine.upcoming],
+        past=[booking_out(booking, rules) for booking in mine.past],
+        cancelled=[booking_out(booking, rules) for booking in mine.cancelled],
     )
 
 
@@ -106,4 +124,18 @@ def create_booking(body: BookingCreate, request: Request, user: Booker, db: Db) 
     booking = booking_service.create_booking(
         db, user, body.room_id, body.date, body.start, body.end, body.purpose, body.participants, client_ip(request)
     )
-    return booking_out(booking)
+    return booking_out(booking, booking_service.cancel_rules(db, user))
+
+
+@router.post("/{booking_id}/cancel", response_model=BookingOut)
+def cancel_booking(
+    booking_id: int, request: Request, user: Canceller, db: Db, body: BookingCancel | None = None
+) -> BookingOut:
+    """Annule une réservation : elle passe « Annulée » et le créneau redevient libre ; jamais supprimée.
+
+    Le titulaire annule jusqu'à 2 h avant le début (RG-05) ; le gestionnaire à tout moment.
+    404 : réservation inconnue ou d'un autre utilisateur ; 409 : déjà annulée, terminée ou trop tard.
+    """
+    reason = body.reason if body else None
+    booking = booking_service.cancel_booking(db, user, booking_id, reason, client_ip(request))
+    return booking_out(booking, booking_service.cancel_rules(db, user))

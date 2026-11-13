@@ -21,6 +21,7 @@ DEFAULT_SETTINGS = {
     "booking_horizon_days_teacher": "30",
     "max_upcoming_bookings_student": "4",
     "max_weekly_hours_student": "8",
+    "cancellation_notice_hours": "2",  # migration 0010 (RG-05, SC-29)
 }
 
 

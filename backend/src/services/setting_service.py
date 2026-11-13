@@ -17,6 +17,8 @@ class SettingKey(enum.StrEnum):
     # Quotas d'un étudiant (RG-07)
     MAX_UPCOMING_BOOKINGS_STUDENT = "max_upcoming_bookings_student"
     MAX_WEEKLY_HOURS_STUDENT = "max_weekly_hours_student"
+    # Délai d'annulation, en heures avant le début (RG-05, SC-29)
+    CANCELLATION_NOTICE_HOURS = "cancellation_notice_hours"
 
 
 def get_int(db: Session, key: SettingKey) -> int:
