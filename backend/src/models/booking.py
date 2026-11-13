@@ -71,6 +71,9 @@ class Booking(Base):
         default=BookingStatus.CONFIRMEE,
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Annulation (SC-29) : la réservation reste en base avec sa date et son motif d'annulation
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancel_reason: Mapped[str | None] = mapped_column(String(200))
 
     room: Mapped[Room] = relationship()
     holder: Mapped[User] = relationship()

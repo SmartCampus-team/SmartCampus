@@ -1,4 +1,5 @@
-// Réservations des salles (SC-25, EF-BOOK-01) et « Mes réservations » (SC-28, EF-BOOK-03).
+// Réservations des salles (SC-25, EF-BOOK-01), « Mes réservations » (SC-28, EF-BOOK-03)
+// et annulation (SC-29, EF-BOOK-04).
 
 import type { Role, Session } from '../auth/session'
 import { apiJson } from './client'
@@ -33,6 +34,11 @@ export interface Booking {
   participants: number
   status: BookingStatus
   created_at: string
+  // Annulation (SC-29) : l'API dit si le bouton est actif, et sinon pourquoi
+  can_cancel: boolean
+  cancel_refusal: string | null
+  cancelled_at: string | null
+  cancel_reason: string | null
 }
 
 export interface BookingInput {
@@ -66,4 +72,9 @@ export interface MyBookings {
 
 export function fetchMyBookings(session: Session): Promise<MyBookings> {
   return apiJson<MyBookings>(session, '/api/bookings/me')
+}
+
+/** Annule une réservation (SC-29) ; le motif est facultatif (gestionnaire). */
+export function cancelBooking(session: Session, id: number, reason?: string): Promise<Booking> {
+  return apiJson<Booking>(session, `/api/bookings/${id}/cancel`, 'POST', reason ? { reason } : undefined)
 }

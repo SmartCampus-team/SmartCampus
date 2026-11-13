@@ -196,3 +196,31 @@
     height: 3rem;
   }
 }
+
+/* Annulation (SC-29) */
+.booking-message {
+  margin: 0 0 1.25rem;
+}
+
+.booking-cancel {
+  min-height: 2.25rem;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.875rem;
+  color: #b42318;
+}
+
+.booking-cancel svg {
+  width: 16px;
+  height: 16px;
+}
+
+.booking-action-hint {
+  font-size: 0.8rem;
+  color: var(--sc-muted);
+}
+
+.booking-cancelled {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--sc-muted);
+}
