@@ -6,18 +6,39 @@ supprimée : elle change de statut (RG-12). Un amphithéâtre ne se réserve pas
 la demande validée par le gestionnaire arrive avec SC-50 (RG-09).
 
 Les dates sont stockées en UTC (timestamptz) et affichées à l'heure du campus (Africa/Casablanca).
+
+SC-26 (RG-04, RG-07) : horizon et quotas, lus dans la table settings (quota_service.py).
+
+SC-27 (EF-BOOK-02, RG-01, ENF-06) : une salle n'est jamais attribuée deux fois sur le même créneau.
+La salle est verrouillée (SELECT … FOR UPDATE) le temps de vérifier blocages et réservations puis
+d'enregistrer : deux demandes simultanées passent l'une après l'autre. La contrainte d'exclusion de
+la table bookings reste le dernier filet : si elle refuse, l'API répond aussi 409.
+
+SC-28 (EF-BOOK-03) : « Mes réservations », à venir, passées et annulées ; chacun ne voit que les siennes.
+
+SC-29 (EF-BOOK-04, RG-05, RG-12) : le titulaire annule jusqu'à 2 h avant le début (délai lu dans
+settings) ; le gestionnaire annule à tout moment. Annulée, la réservation libère le créneau mais
+reste en base, avec la date et le motif de l'annulation.
+
+SC-30 (EF-BOOK-05) : une réservation non commencée change de créneau ou de salle avec les mêmes
+contrôles qu'à la création (RG-01, RG-03, RG-04, RG-07, RG-08) ; si l'un d'eux refuse, rien ne change.
 """
 
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, selectinload
 
 from src.config import settings
-from src.models.booking import Booking, BookingStatus
+from src.models.blocking import Blocking
+from src.models.booking import OCCUPYING_STATUSES, Booking, BookingStatus
 from src.models.room import Room, RoomStatus, RoomType
 from src.models.user import Role, User
-from src.services import audit_service, campus_clock, room_service
+from src.services import audit_service, campus_clock, quota_service, room_service, setting_service
 from src.services.common import ServiceError
+from src.services.setting_service import SettingKey
 
 # Rôles qui réservent pour eux-mêmes ; le gestionnaire gère les salles sans réserver
 BOOKING_ROLES = (Role.ETUDIANT, Role.ENSEIGNANT)
@@ -32,6 +53,20 @@ AMPHITHEATRE = (
 TOO_MANY_PARTICIPANTS = (
     "La salle {code} compte {capacity} places pour {participants} participants : choisissez une salle plus grande."
 )
+SLOT_TAKEN = "Créneau déjà réservé : choisissez un autre créneau ou une autre salle."
+ROOM_BLOCKED = "Salle bloquée sur ce créneau : {reason}."
+
+BOOKING_NOT_FOUND = "Réservation introuvable."
+ALREADY_CANCELLED = "Cette réservation est déjà annulée."
+NOT_CANCELLABLE = "Cette réservation ne peut plus être annulée."
+FINISHED = "Cette réservation est terminée : elle ne peut plus être annulée."
+STARTED = "Cette réservation a déjà commencé : contactez le gestionnaire des salles pour l'annuler."
+TOO_LATE = "Annulation impossible moins de {hours} h avant le début : contactez le gestionnaire des salles."
+NOT_EDITABLE = "Seule une réservation en attente ou confirmée peut être modifiée."
+EDIT_STARTED = "Cette réservation a déjà commencé : elle ne peut plus être modifiée."
+
+# Code d'erreur PostgreSQL d'une contrainte d'exclusion (ex_bookings_no_overlap)
+EXCLUSION_VIOLATION = "23P01"
 
 WHO = {Role.ETUDIANT: "un étudiant", Role.ENSEIGNANT: "un enseignant"}
 
@@ -81,6 +116,84 @@ def check_room(room: Room, participants: int) -> None:
         )
 
 
+@dataclass
+class MyBookings:
+    upcoming: list[Booking]  # en attente ou confirmées, pas encore terminées ; la plus proche d'abord
+    past: list[Booking]  # terminées ; la plus récente d'abord
+    cancelled: list[Booking]  # annulées ou refusées ; la plus récente d'abord
+
+
+CANCELLED_STATUSES = (BookingStatus.ANNULEE, BookingStatus.REFUSEE)
+
+
+def list_mine(db: Session, user: User, now: datetime | None = None) -> MyBookings:
+    """Les réservations de l'utilisateur, et seulement les siennes, réparties en trois onglets."""
+    now = now or campus_clock.now()
+    bookings = db.scalars(
+        select(Booking)
+        .where(Booking.holder_id == user.id)
+        .options(selectinload(Booking.room))
+        .order_by(Booking.start_at)
+    ).all()
+    mine = MyBookings(upcoming=[], past=[], cancelled=[])
+    for booking in bookings:
+        if booking.status in CANCELLED_STATUSES:
+            mine.cancelled.append(booking)
+        elif booking.end_at > now and booking.status in OCCUPYING_STATUSES:
+            mine.upcoming.append(booking)
+        else:
+            mine.past.append(booking)
+    mine.past.reverse()
+    mine.cancelled.reverse()
+    return mine
+
+
+def lock_room(db: Session, room_id: int) -> Room:
+    """Verrouille la salle jusqu'à la fin de la transaction (RG-01) ; 404 si inconnue ou archivée.
+
+    Une autre réservation ou un blocage de la même salle attend que celle-ci soit enregistrée.
+    """
+    db.execute(select(Room.id).where(Room.id == room_id).with_for_update())
+    return room_service.get_room(db, room_id)
+
+
+def check_free(db: Session, room: Room, start_at: datetime, end_at: datetime, exclude_id: int | None = None) -> None:
+    """409 si un blocage ou une réservation qui occupe la salle (en attente ou confirmée) chevauche le créneau.
+
+    exclude_id : la réservation que l'on modifie ne se gêne pas elle-même (SC-30).
+    """
+    blocking = db.scalar(
+        select(Blocking)
+        .where(Blocking.room_id == room.id, Blocking.start_at < end_at, Blocking.end_at > start_at)
+        .order_by(Blocking.start_at)
+        .limit(1)
+    )
+    if blocking is not None:
+        raise ServiceError(409, ROOM_BLOCKED.format(reason=blocking.reason))
+
+    overlapping = select(Booking.id).where(
+        Booking.room_id == room.id,
+        Booking.status.in_(OCCUPYING_STATUSES),
+        Booking.start_at < end_at,
+        Booking.end_at > start_at,
+    )
+    if exclude_id is not None:
+        overlapping = overlapping.where(Booking.id != exclude_id)
+    if db.scalar(overlapping.limit(1)) is not None:
+        raise ServiceError(409, SLOT_TAKEN)
+
+
+def save(db: Session) -> None:
+    """Écrit en base ; un chevauchement refusé par la contrainte d'exclusion devient une erreur 409 lisible."""
+    try:
+        db.flush()
+    except IntegrityError as error:
+        if getattr(error.orig, "sqlstate", None) != EXCLUSION_VIOLATION:
+            raise
+        db.rollback()
+        raise ServiceError(409, SLOT_TAKEN) from None
+
+
 def create_booking(
     db: Session,
     user: User,
@@ -93,9 +206,12 @@ def create_booking(
     ip: str | None,
 ) -> Booking:
     """Crée une réservation « Confirmée » et l'écrit dans AuditLog ; 400, 404 ou 409 sinon."""
-    room = room_service.get_room(db, room_id)  # 404 si inconnue ou archivée
     start_at, end_at = check_slot(user, day, start, end)
+    quota_service.check_horizon(db, user, start_at)
+    quota_service.check_quotas(db, user, start_at, end_at)
+    room = lock_room(db, room_id)  # 404 si inconnue ou archivée
     check_room(room, participants)
+    check_free(db, room, start_at, end_at)
 
     booking = Booking(
         room=room,
@@ -107,8 +223,117 @@ def create_booking(
         status=BookingStatus.CONFIRMEE,
     )
     db.add(booking)
-    db.flush()  # attribue l'identifiant, écrit dans le journal
+    save(db)  # attribue l'identifiant, écrit dans le journal
     target = f"réservation {booking.id} : {describe(booking)}"
     audit_service.record(db, "BOOKING_CREATED", actor=user, target=target, ip=ip)
+    db.commit()
+    return booking
+
+
+@dataclass
+class CancelRules:
+    """Qui peut annuler quoi, maintenant (RG-05) : sert à l'annulation et à l'état du bouton « Annuler »."""
+
+    user: User
+    notice: timedelta  # délai d'annulation du titulaire
+    now: datetime
+
+    def refusal(self, booking: Booking) -> ServiceError | None:
+        """L'erreur à renvoyer si l'utilisateur ne peut pas annuler cette réservation ; None s'il le peut."""
+        if booking.status == BookingStatus.ANNULEE:
+            return ServiceError(409, ALREADY_CANCELLED)
+        if booking.status not in OCCUPYING_STATUSES:
+            return ServiceError(409, NOT_CANCELLABLE)
+        if booking.end_at <= self.now:
+            return ServiceError(409, FINISHED)
+        if self.user.role == Role.GESTIONNAIRE:
+            return None  # le gestionnaire annule à tout moment
+        if booking.start_at <= self.now:
+            return ServiceError(409, STARTED)
+        if booking.start_at - self.now < self.notice:
+            return ServiceError(409, TOO_LATE.format(hours=int(self.notice.total_seconds() // 3600)))
+        return None
+
+
+def cancel_rules(db: Session, user: User, now: datetime | None = None) -> CancelRules:
+    hours = setting_service.get_int(db, SettingKey.CANCELLATION_NOTICE_HOURS)
+    return CancelRules(user=user, notice=timedelta(hours=hours), now=now or campus_clock.now())
+
+
+def get_booking(db: Session, user: User, booking_id: int) -> Booking:
+    """La réservation, si l'utilisateur en est le titulaire ou le gestionnaire ; 404 sinon."""
+    booking = db.get(Booking, booking_id)
+    if booking is None or (booking.holder_id != user.id and user.role != Role.GESTIONNAIRE):
+        raise ServiceError(404, BOOKING_NOT_FOUND)
+    return booking
+
+
+def cancel_booking(db: Session, user: User, booking_id: int, reason: str | None, ip: str | None) -> Booking:
+    """Passe la réservation « Annulée » : le créneau redevient libre, rien n'est supprimé (RG-12)."""
+    booking = get_booking(db, user, booking_id)
+    rules = cancel_rules(db, user)
+    refusal = rules.refusal(booking)
+    if refusal is not None:
+        raise refusal
+
+    booking.status = BookingStatus.ANNULEE
+    booking.cancelled_at = rules.now
+    booking.cancel_reason = (reason or "").strip() or None
+    by_manager = " (par le gestionnaire)" if booking.holder_id != user.id else ""
+    target = f"réservation {booking.id} : {describe(booking)}{by_manager}"
+    audit_service.record(db, "BOOKING_CANCELLED", actor=user, target=target[:255], ip=ip)
+    db.commit()
+    return booking
+
+
+@dataclass
+class BookingChanges:
+    """Champs à modifier ; None = inchangé (SC-30)."""
+
+    room_id: int | None = None
+    day: date | None = None
+    start: time | None = None
+    end: time | None = None
+    purpose: str | None = None
+    participants: int | None = None
+
+
+def can_edit(booking: Booking, user: User, now: datetime) -> bool:
+    """Le titulaire modifie sa réservation tant qu'elle occupe la salle et n'a pas commencé."""
+    return booking.holder_id == user.id and booking.status in OCCUPYING_STATUSES and booking.start_at > now
+
+
+def update_booking(db: Session, user: User, booking_id: int, changes: BookingChanges, ip: str | None) -> Booking:
+    """Change le créneau, la salle, le motif ou les participants ; en cas de refus, la réservation reste intacte."""
+    booking = get_booking(db, user, booking_id)
+    if booking.holder_id != user.id:
+        raise ServiceError(404, BOOKING_NOT_FOUND)
+    if booking.status not in OCCUPYING_STATUSES:
+        raise ServiceError(409, NOT_EDITABLE)
+    now = campus_clock.now()
+    if booking.start_at <= now:
+        raise ServiceError(409, EDIT_STARTED)
+
+    # Valeurs actuelles, remplacées par celles envoyées
+    start, end = campus_clock.local(booking.start_at), campus_clock.local(booking.end_at)
+    day = changes.day or start.date()
+    start_at, end_at = check_slot(user, day, changes.start or start.time(), changes.end or end.time(), now)
+    participants = changes.participants or booking.participants
+    quota_service.check_horizon(db, user, start_at)
+    quota_service.check_quotas(db, user, start_at, end_at, now, exclude_id=booking.id)
+    room = lock_room(db, changes.room_id or booking.room_id)
+    check_room(room, participants)
+    check_free(db, room, start_at, end_at, exclude_id=booking.id)
+
+    before = describe(booking)
+    booking.room = room
+    booking.start_at, booking.end_at = start_at, end_at
+    booking.participants = participants
+    if changes.purpose is not None:
+        booking.purpose = changes.purpose.strip()
+    save(db)
+    # L'ancien et le nouveau créneau, dans le journal
+    target = f"réservation {booking.id} : {before} → {describe(booking)}"
+    audit_service.record(db, "BOOKING_UPDATED", actor=user, target=target, ip=ip)
     db.commit()
     return booking

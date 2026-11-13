@@ -3,6 +3,8 @@
 // libellé (Réservé, En attente de validation, Bloqué), pas seulement une couleur.
 // Adresse : #/salles/3?date=2026-11-02&vue=semaine
 // SC-25 : l'étudiant et l'enseignant réservent la salle depuis son planning (EF-BOOK-01).
+// SC-28 : on y revient aussi depuis « Mes réservations ».
+// SC-29 : le gestionnaire annule une réservation en cliquant dessus (EF-BOOK-04, à tout moment).
 
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { canBook, type Booking } from '../api/bookings'
@@ -27,6 +29,7 @@ import {
 } from '../dates'
 import { Link, navigate, withQuery, type Location } from '../router'
 import BookingDialog, { type BookingDraft } from './BookingDialog'
+import CancelBookingDialog from './CancelBookingDialog'
 import StatusPage from './StatusPage'
 import './RoomPlanningPage.css'
 
@@ -80,6 +83,12 @@ function entryClass(entry: PlanningEntry): string {
   return classes.join(' ')
 }
 
+/** « 2026-11-12T10:30 » : instant comparable à la fin d'un créneau, à l'heure de l'ordinateur. */
+function nowKey(): string {
+  const now = new Date()
+  return `${isoDate(now)}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
 function entryText(entry: PlanningEntry): string {
   const parts = [`${shortTime(entry.start)} – ${shortTime(entry.end)}`, entry.label]
   if (entry.detail) parts.push(entry.detail)
@@ -92,7 +101,8 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
   const date = isValidIsoDate(location.query.get('date')) ? (location.query.get('date') as string) : today
   const view: PlanningView = location.query.get('vue') === 'semaine' ? 'week' : 'day'
   const back = location.query.get('retour')
-  const backTo = back && (back.startsWith('/salles') || back.startsWith('/gestion/salles')) ? back : '/salles'
+  const backTo =
+    back && ['/salles', '/gestion/salles', '/reservations'].some((prefix) => back.startsWith(prefix)) ? back : '/salles'
 
   const [planning, setPlanning] = useState<Planning | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -102,6 +112,10 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
   const [bookingOpen, setBookingOpen] = useState(false)
   const [confirmation, setConfirmation] = useState<Booking | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  // Annulation par le gestionnaire (SC-29)
+  const [cancelling, setCancelling] = useState<PlanningEntry | null>(null)
+  const [cancelMessage, setCancelMessage] = useState<string | null>(null)
+  const isManager = session.user.role === 'gestionnaire'
 
   useEffect(() => {
     let active = true
@@ -142,6 +156,25 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
   const days = planning?.days ?? []
   const bookable = !!room && canBook(session.user.role) && room.status === 'active'
 
+  /** Le gestionnaire peut annuler une réservation qui occupe la salle et n'est pas terminée. */
+  function canManagerCancel(entry: PlanningEntry, now: string): boolean {
+    return (
+      isManager &&
+      entry.kind === 'reservation' &&
+      (entry.status === 'confirmee' || entry.status === 'en_attente') &&
+      `${entry.day}T${shortTime(entry.end)}` > now
+    )
+  }
+
+  function handleCancelled(booking: Booking) {
+    setCancelling(null)
+    setCancelMessage(
+      `Réservation annulée : ${formatLongDate(booking.date)}, ${shortTime(booking.start)} – ${shortTime(booking.end)}. ` +
+        'Le créneau est de nouveau libre.',
+    )
+    setReloadKey((key) => key + 1)
+  }
+
   function handleBooked(created: Booking) {
     setBookingOpen(false)
     setConfirmation(created)
@@ -161,7 +194,11 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
     <>
       <Link to={backTo} className="back-link">
         <ChevronLeftIcon />
-        {backTo.startsWith('/gestion') ? 'Retour à la gestion des salles' : 'Retour aux salles'}
+        {backTo.startsWith('/gestion')
+          ? 'Retour à la gestion des salles'
+          : backTo.startsWith('/reservations')
+            ? 'Retour à mes réservations'
+            : 'Retour aux salles'}
       </Link>
 
       <header className="page-head">
@@ -205,7 +242,8 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
         <p className="notice notice-success planning-status" role="status">
           <span>
             Réservation confirmée : {formatLongDate(confirmation.date)}, {shortTime(confirmation.start)} –{' '}
-            {shortTime(confirmation.end)}, « {confirmation.purpose} ».
+            {shortTime(confirmation.end)}, « {confirmation.purpose} ».{' '}
+            <Link to="/reservations">Voir mes réservations</Link>
           </span>
         </p>
       )}
@@ -216,6 +254,12 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
             ? 'Salle archivée : son planning reste consultable pour retrouver ses réservations passées.'
             : `Salle ${ROOM_STATUS_LABELS[room.status].toLowerCase()} : elle ne peut pas être réservée pour le moment.`}
           {room.description ? ` ${room.description}` : ''}
+        </p>
+      )}
+
+      {cancelMessage && (
+        <p className="notice notice-success planning-status" role="status">
+          {cancelMessage}
         </p>
       )}
 
@@ -295,6 +339,10 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
           </li>
         </ul>
 
+        {isManager && planning && planning.entries.some((entry) => canManagerCancel(entry, nowKey())) && (
+          <p className="planning-hint">Cliquez sur une réservation pour l'annuler.</p>
+        )}
+
         {view === 'day' && !isOpenDay(date) && (
           <p className="notice notice-info" role="status">
             Le campus est fermé le dimanche.
@@ -344,13 +392,10 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
               {planning.entries.map((entry) => {
                 const column = days.indexOf(entry.day)
                 if (column === -1) return null
-                return (
-                  <div
-                    key={`${entry.kind}-${entry.id}-${entry.day}`}
-                    className={entryClass(entry)}
-                    style={{ gridColumn: column + 2, gridRow: `${rowOf(entry.start)} / ${rowOf(entry.end)}` }}
-                    title={entryText(entry)}
-                  >
+                const key = `${entry.kind}-${entry.id}-${entry.day}`
+                const style = { gridColumn: column + 2, gridRow: `${rowOf(entry.start)} / ${rowOf(entry.end)}` }
+                const content = (
+                  <>
                     <span className="visually-hidden">{formatShortDay(entry.day)}, </span>
                     <strong>
                       {shortTime(entry.start)} – {shortTime(entry.end)}
@@ -358,6 +403,29 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
                     <span className="planning-entry-label">{entry.label}</span>
                     {entry.detail && <span className="planning-entry-detail">{entry.detail}</span>}
                     {entry.holder_name && <span className="planning-entry-detail">{entry.holder_name}</span>}
+                  </>
+                )
+                if (canManagerCancel(entry, nowKey())) {
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`${entryClass(entry)} planning-entry-button`}
+                      style={style}
+                      title={`${entryText(entry)} — cliquer pour annuler`}
+                      onClick={() => {
+                        setCancelMessage(null)
+                        setCancelling(entry)
+                      }}
+                    >
+                      {content}
+                      <span className="visually-hidden"> (annuler cette réservation)</span>
+                    </button>
+                  )
+                }
+                return (
+                  <div key={key} className={entryClass(entry)} style={style} title={entryText(entry)}>
+                    {content}
                   </div>
                 )
               })}
@@ -373,6 +441,23 @@ export default function RoomPlanningPage({ session, roomId, location }: Props) {
         )}
         {loading && !planning && <p className="loading">Chargement du planning…</p>}
       </section>
+
+      {cancelling && room && (
+        <CancelBookingDialog
+          session={session}
+          target={{
+            id: cancelling.id,
+            roomCode: room.code,
+            date: cancelling.day,
+            start: cancelling.start,
+            end: cancelling.end,
+            holderName: cancelling.holder_name,
+          }}
+          askReason
+          onClose={() => setCancelling(null)}
+          onCancelled={handleCancelled}
+        />
+      )}
 
       {bookingOpen && room && (
         <BookingDialog

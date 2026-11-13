@@ -25,6 +25,7 @@ os.environ["MAIL_BACKEND"] = "memory"  # e-mails gardés en mémoire, jamais env
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
@@ -34,8 +35,10 @@ if not (make_url(TEST_DATABASE_URL).database or "").endswith("_test"):
 import src.models
 from src.database import Base, SessionLocal, engine
 from src.main import app
+from src.models.setting import Setting
 from src.models.user import Role, User
 from src.services.security import hash_password
+from tests.factories import DEFAULT_SETTINGS
 from tests.helpers import PASSWORD
 
 for _module in pkgutil.iter_modules(src.models.__path__):
@@ -44,6 +47,10 @@ for _module in pkgutil.iter_modules(src.models.__path__):
 
 @pytest.fixture(scope="session", autouse=True)
 def schema() -> Iterator[None]:
+    with engine.begin() as conn:
+        # Contrainte d'exclusion des réservations (SC-27) ; extension « de confiance » :
+        # le propriétaire de la base peut la créer sans être superutilisateur
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     yield
@@ -65,6 +72,13 @@ def db() -> Iterator[Session]:
         yield session
     finally:
         session.close()
+
+
+@pytest.fixture(autouse=True)
+def default_settings(db: Session) -> None:
+    """Valeurs des règles de gestion, comme après « alembic upgrade head » (SC-26)."""
+    db.add_all(Setting(key=key, value=value, description=key) for key, value in DEFAULT_SETTINGS.items())
+    db.commit()
 
 
 @pytest.fixture
