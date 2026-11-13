@@ -19,6 +19,9 @@ SC-28 (EF-BOOK-03) : « Mes réservations », à venir, passées et annulées ; 
 SC-29 (EF-BOOK-04, RG-05, RG-12) : le titulaire annule jusqu'à 2 h avant le début (délai lu dans
 settings) ; le gestionnaire annule à tout moment. Annulée, la réservation libère le créneau mais
 reste en base, avec la date et le motif de l'annulation.
+
+SC-30 (EF-BOOK-05) : une réservation non commencée change de créneau ou de salle avec les mêmes
+contrôles qu'à la création (RG-01, RG-03, RG-04, RG-07, RG-08) ; si l'un d'eux refuse, rien ne change.
 """
 
 from dataclasses import dataclass
@@ -59,6 +62,8 @@ NOT_CANCELLABLE = "Cette réservation ne peut plus être annulée."
 FINISHED = "Cette réservation est terminée : elle ne peut plus être annulée."
 STARTED = "Cette réservation a déjà commencé : contactez le gestionnaire des salles pour l'annuler."
 TOO_LATE = "Annulation impossible moins de {hours} h avant le début : contactez le gestionnaire des salles."
+NOT_EDITABLE = "Seule une réservation en attente ou confirmée peut être modifiée."
+EDIT_STARTED = "Cette réservation a déjà commencé : elle ne peut plus être modifiée."
 
 # Code d'erreur PostgreSQL d'une contrainte d'exclusion (ex_bookings_no_overlap)
 EXCLUSION_VIOLATION = "23P01"
@@ -152,8 +157,11 @@ def lock_room(db: Session, room_id: int) -> Room:
     return room_service.get_room(db, room_id)
 
 
-def check_free(db: Session, room: Room, start_at: datetime, end_at: datetime) -> None:
-    """409 si un blocage ou une réservation qui occupe la salle (en attente ou confirmée) chevauche le créneau."""
+def check_free(db: Session, room: Room, start_at: datetime, end_at: datetime, exclude_id: int | None = None) -> None:
+    """409 si un blocage ou une réservation qui occupe la salle (en attente ou confirmée) chevauche le créneau.
+
+    exclude_id : la réservation que l'on modifie ne se gêne pas elle-même (SC-30).
+    """
     blocking = db.scalar(
         select(Blocking)
         .where(Blocking.room_id == room.id, Blocking.start_at < end_at, Blocking.end_at > start_at)
@@ -169,6 +177,8 @@ def check_free(db: Session, room: Room, start_at: datetime, end_at: datetime) ->
         Booking.start_at < end_at,
         Booking.end_at > start_at,
     )
+    if exclude_id is not None:
+        overlapping = overlapping.where(Booking.id != exclude_id)
     if db.scalar(overlapping.limit(1)) is not None:
         raise ServiceError(409, SLOT_TAKEN)
 
@@ -272,5 +282,58 @@ def cancel_booking(db: Session, user: User, booking_id: int, reason: str | None,
     by_manager = " (par le gestionnaire)" if booking.holder_id != user.id else ""
     target = f"réservation {booking.id} : {describe(booking)}{by_manager}"
     audit_service.record(db, "BOOKING_CANCELLED", actor=user, target=target[:255], ip=ip)
+    db.commit()
+    return booking
+
+
+@dataclass
+class BookingChanges:
+    """Champs à modifier ; None = inchangé (SC-30)."""
+
+    room_id: int | None = None
+    day: date | None = None
+    start: time | None = None
+    end: time | None = None
+    purpose: str | None = None
+    participants: int | None = None
+
+
+def can_edit(booking: Booking, user: User, now: datetime) -> bool:
+    """Le titulaire modifie sa réservation tant qu'elle occupe la salle et n'a pas commencé."""
+    return booking.holder_id == user.id and booking.status in OCCUPYING_STATUSES and booking.start_at > now
+
+
+def update_booking(db: Session, user: User, booking_id: int, changes: BookingChanges, ip: str | None) -> Booking:
+    """Change le créneau, la salle, le motif ou les participants ; en cas de refus, la réservation reste intacte."""
+    booking = get_booking(db, user, booking_id)
+    if booking.holder_id != user.id:
+        raise ServiceError(404, BOOKING_NOT_FOUND)
+    if booking.status not in OCCUPYING_STATUSES:
+        raise ServiceError(409, NOT_EDITABLE)
+    now = campus_clock.now()
+    if booking.start_at <= now:
+        raise ServiceError(409, EDIT_STARTED)
+
+    # Valeurs actuelles, remplacées par celles envoyées
+    start, end = campus_clock.local(booking.start_at), campus_clock.local(booking.end_at)
+    day = changes.day or start.date()
+    start_at, end_at = check_slot(user, day, changes.start or start.time(), changes.end or end.time(), now)
+    participants = changes.participants or booking.participants
+    quota_service.check_horizon(db, user, start_at)
+    quota_service.check_quotas(db, user, start_at, end_at, now, exclude_id=booking.id)
+    room = lock_room(db, changes.room_id or booking.room_id)
+    check_room(room, participants)
+    check_free(db, room, start_at, end_at, exclude_id=booking.id)
+
+    before = describe(booking)
+    booking.room = room
+    booking.start_at, booking.end_at = start_at, end_at
+    booking.participants = participants
+    if changes.purpose is not None:
+        booking.purpose = changes.purpose.strip()
+    save(db)
+    # L'ancien et le nouveau créneau, dans le journal
+    target = f"réservation {booking.id} : {before} → {describe(booking)}"
+    audit_service.record(db, "BOOKING_UPDATED", actor=user, target=target, ip=ip)
     db.commit()
     return booking
