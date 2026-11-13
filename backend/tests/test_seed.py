@@ -1,10 +1,11 @@
-"""Données de démonstration : le script se relance sans doublon (SC-20, SC-22)."""
+"""Données de démonstration : le script se relance sans doublon (SC-20, SC-22, SC-31)."""
 
 from sqlalchemy import func, select
 
 from src import seed
 from src.models.blocking import Blocking
 from src.models.booking import Booking
+from src.models.equipment import Equipment
 from src.models.room import Room, RoomStatus, RoomType
 from src.models.user import User
 from src.services import campus_clock
@@ -13,6 +14,7 @@ from src.services import campus_clock
 def run_seed(db) -> None:
     seed.seed_accounts(db)
     seed.seed_rooms(db)
+    seed.seed_equipment(db)
     seed.seed_bookings(db)
     db.commit()
 
@@ -46,3 +48,11 @@ def test_demo_bookings_and_blockings_are_upcoming_on_open_days(db):
     assert len(starts) == len(seed.DEMO_BOOKINGS) + len(seed.DEMO_BLOCKINGS)
     assert all(start > campus_clock.now() for start in starts)
     assert all(campus_clock.is_open_day(campus_clock.local(start).date()) for start in starts)
+
+
+def test_seed_equips_the_rooms_once(db):
+    run_seed(db)
+    run_seed(db)
+    assert count(db, Equipment) == len(seed.DEMO_EQUIPMENT)
+    room = db.scalar(select(Room).where(Room.code == "A-101"))
+    assert [item.label for item in room.equipment] == sorted(seed.DEMO_ROOM_EQUIPMENT["A-101"])
