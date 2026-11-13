@@ -1,4 +1,4 @@
-"""Outils de test partagés des tickets du Sprint 2."""
+"""Outils de test partagés des tickets des Sprints 2 et 3."""
 
 from collections.abc import Callable
 from datetime import date, time, timedelta
@@ -89,3 +89,22 @@ def make_blocking(db: Session, room: Room, day: date, start: time, end: time, re
     db.add(blocking)
     db.commit()
     return blocking
+
+
+def booking_body(
+    room: Room,
+    day: date,
+    start: str,
+    end: str,
+    purpose: str = "Révision en groupe",
+    participants: int = 4,
+) -> dict:
+    """Corps de POST /api/bookings (SC-25)."""
+    return {
+        "room_id": room.id,
+        "date": day.isoformat(),
+        "start": start,
+        "end": end,
+        "purpose": purpose,
+        "participants": participants,
+    }

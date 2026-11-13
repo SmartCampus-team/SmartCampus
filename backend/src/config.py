@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     opening_hour: int = 8
     closing_hour: int = 20
     slot_minutes: int = 30
+    # Durée maximale d'une réservation (RG-03) : 2 h pour un étudiant, 4 h pour un enseignant
+    max_booking_minutes_student: int = 120
+    max_booking_minutes_teacher: int = 240
 
     # Réinitialisation du mot de passe (EF-AUTH-05) : lien valable 30 min, à usage unique
     password_reset_minutes: int = 30

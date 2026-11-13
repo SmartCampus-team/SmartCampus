@@ -1,0 +1,17 @@
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: smartcampus
+  namespace: smartcampus
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app: smartcampus
+
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000

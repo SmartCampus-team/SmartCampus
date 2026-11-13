@@ -1,0 +1,10 @@
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smartcampus-config
+  namespace: smartcampus
+
+data:
+  ALLOWED_EMAIL_DOMAIN: "usms.ac.ma"
+  MAX_FAILED_ATTEMPTS: "3"

@@ -1,9 +1,11 @@
 // Salles : la liste des salles du campus (SC-21, EF-ROOM-01) et la recherche d'une salle libre
 // sur un créneau (SC-22, EF-ROOM-02), avec un lien vers le planning de chaque salle (SC-23).
+// SC-25 : chaque salle libre trouvée se réserve sur le créneau cherché (EF-BOOK-01).
 // Les critères de recherche sont dans l'URL :
 // #/salles?date=2026-11-02&debut=10:00&fin=12:00&participants=20
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { canBook, type Booking } from '../api/bookings'
 import { errorMessage } from '../api/client'
 import {
   fetchRooms,
@@ -16,7 +18,7 @@ import {
   type RoomType,
 } from '../api/rooms'
 import type { Session } from '../auth/session'
-import { ArrowIcon, BuildingIcon, MapPinIcon, SearchIcon, UsersIcon } from '../components/icons'
+import { ArrowIcon, BuildingIcon, CalendarCheckIcon, MapPinIcon, SearchIcon, UsersIcon } from '../components/icons'
 import {
   CLOSING,
   defaultSlot,
@@ -24,11 +26,13 @@ import {
   isOpenDay,
   isValidIsoDate,
   OPENING,
+  shortTime,
   STEP_MINUTES,
   timeOptions,
   toMinutes,
 } from '../dates'
 import { Link, navigate, withQuery, type Location } from '../router'
+import BookingDialog from './BookingDialog'
 import { planningPath } from './RoomPlanningPage'
 import './RoomsPage.css'
 
@@ -98,7 +102,7 @@ function checkCriteria(criteria: Criteria): string | null {
   return null
 }
 
-export function RoomCard({ room, planningTo }: { room: Room; planningTo?: string }) {
+export function RoomCard({ room, planningTo, action }: { room: Room; planningTo?: string; action?: ReactNode }) {
   return (
     <article className="room-card">
       <header className="room-card-head">
@@ -121,11 +125,16 @@ export function RoomCard({ room, planningTo }: { room: Room; planningTo?: string
       {/* Le catalogue d'équipements arrive avec SC-31 (Sprint 3) */}
       <p className="room-equipment">Équipements : aucun renseigné</p>
       {room.description && <p className="room-description">{room.description}</p>}
-      {planningTo && (
-        <Link to={planningTo} className="room-card-link">
-          Voir le planning
-          <ArrowIcon />
-        </Link>
+      {(planningTo || action) && (
+        <div className="room-card-foot">
+          {planningTo && (
+            <Link to={planningTo} className="room-card-link">
+              Voir le planning
+              <ArrowIcon />
+            </Link>
+          )}
+          {action}
+        </div>
       )}
     </article>
   )
@@ -138,6 +147,11 @@ export default function RoomsPage({ session, location }: Props) {
   const [searching, setSearching] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [buildings, setBuildings] = useState<string[]>([])
+  // Réservation depuis les résultats (SC-25) : salle choisie, confirmation, recherche relancée ensuite
+  const [booking, setBooking] = useState<Room | null>(null)
+  const [confirmation, setConfirmation] = useState<Booking | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  const bookable = canBook(session.user.role)
 
   const [rooms, setRooms] = useState<Room[] | null>(null)
   const [query, setQuery] = useState('')
@@ -182,7 +196,7 @@ export default function RoomsPage({ session, location }: Props) {
     return () => {
       active = false
     }
-  }, [session, searched, initial])
+  }, [session, searched, initial, reloadKey])
 
   // Liste des salles (SC-21) : la recherche par texte part 300 ms après la dernière frappe
   useEffect(() => {
@@ -214,13 +228,41 @@ export default function RoomsPage({ session, location }: Props) {
     // Créneau refusé : le message s'affiche et la recherche ne part pas
     const problem = checkCriteria(criteria)
     setFormError(problem)
+    setConfirmation(null)
     if (!problem) navigate(criteriaToPath(criteria))
   }
 
   function handleReset() {
     setFormError(null)
+    setConfirmation(null)
     setCriteria(criteriaFromQuery(new URLSearchParams()).criteria)
     navigate('/salles')
+  }
+
+  function handleBooked(created: Booking) {
+    setBooking(null)
+    setConfirmation(created)
+    setReloadKey((key) => key + 1) // la salle réservée sort des salles libres
+  }
+
+  /** Bouton « Réserver » d'une salle libre ; un amphithéâtre passe par une demande validée (SC-50). */
+  function bookAction(room: Room): ReactNode {
+    if (!bookable) return undefined
+    if (room.room_type === 'amphitheatre') return <span className="room-card-note">Sur demande validée</span>
+    return (
+      <button
+        type="button"
+        className="button-primary room-card-book"
+        onClick={() => {
+          setConfirmation(null)
+          setBooking(room)
+        }}
+        aria-label={`Réserver la salle ${room.code}`}
+      >
+        <CalendarCheckIcon />
+        Réserver
+      </button>
+    )
   }
 
   const filtered = filters.q !== '' || filters.room_type !== ''
@@ -358,6 +400,16 @@ export default function RoomsPage({ session, location }: Props) {
             </button>
           </div>
 
+          {confirmation && (
+            <p className="notice notice-success booking-confirmation" role="status">
+              <span>
+                Réservation confirmée : salle {confirmation.room.code}, {formatLongDate(confirmation.date)},{' '}
+                {shortTime(confirmation.start)} – {shortTime(confirmation.end)}.{' '}
+                <Link to={planningPath(confirmation.room.id, { date: confirmation.date })}>Voir le planning</Link>
+              </span>
+            </p>
+          )}
+
           {result && result.rooms.length === 0 && (
             <div className="empty-state">
               <SearchIcon className="empty-icon" />
@@ -371,6 +423,7 @@ export default function RoomsPage({ session, location }: Props) {
                   <RoomCard
                     room={room}
                     planningTo={planningPath(room.id, { date: initial.date, back: criteriaToPath(initial) })}
+                    action={bookAction(room)}
                   />
                 </li>
               ))}
@@ -459,6 +512,16 @@ export default function RoomsPage({ session, location }: Props) {
             </ul>
           )}
         </section>
+      )}
+
+      {booking && (
+        <BookingDialog
+          session={session}
+          room={booking}
+          initial={{ date: initial.date, start: initial.start, end: initial.end, participants: initial.participants }}
+          onClose={() => setBooking(null)}
+          onBooked={handleBooked}
+        />
       )}
     </>
   )

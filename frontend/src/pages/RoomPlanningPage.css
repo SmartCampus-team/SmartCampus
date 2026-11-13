@@ -254,3 +254,11 @@
     flex: 1;
   }
 }
+
+/* Réserver depuis le planning (SC-25) */
+.page-head .planning-book-note {
+  margin: 0;
+  max-width: 22rem;
+  font-size: 0.85rem;
+  color: var(--sc-muted);
+}
