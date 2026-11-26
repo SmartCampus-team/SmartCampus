@@ -1,8 +1,9 @@
-"""Données de démonstration : le script se relance sans doublon (SC-20, SC-22, SC-31)."""
+"""Données de démonstration : le script se relance sans doublon (SC-20, SC-22, SC-31, SC-34)."""
 
 from sqlalchemy import func, select
 
 from src import seed
+from src.models.admin_request import AdminRequest, RequestStatus
 from src.models.blocking import Blocking
 from src.models.booking import Booking
 from src.models.equipment import Equipment
@@ -16,6 +17,7 @@ def run_seed(db) -> None:
     seed.seed_rooms(db)
     seed.seed_equipment(db)
     seed.seed_bookings(db)
+    seed.seed_requests(db)
     db.commit()
 
 
@@ -56,3 +58,12 @@ def test_seed_equips_the_rooms_once(db):
     assert count(db, Equipment) == len(seed.DEMO_EQUIPMENT)
     room = db.scalar(select(Room).where(Room.code == "A-101"))
     assert [item.label for item in room.equipment] == sorted(seed.DEMO_ROOM_EQUIPMENT["A-101"])
+
+
+def test_seed_deposits_pending_requests_once(db):
+    run_seed(db)
+    run_seed(db)
+    requests = list(db.scalars(select(AdminRequest).order_by(AdminRequest.created_at)))
+    assert len(requests) == len(seed.DEMO_REQUESTS)
+    assert {request.status for request in requests} == {RequestStatus.EN_ATTENTE}
+    assert requests[0].created_at < requests[-1].created_at  # dates de dépôt échelonnées

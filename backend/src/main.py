@@ -1,7 +1,19 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from src.api.routes import blockings, bookings, equipment, login, me, passwords, planning, rooms, sessions, users
+from src.api.routes import (
+    blockings,
+    bookings,
+    equipment,
+    login,
+    me,
+    passwords,
+    planning,
+    requests,
+    rooms,
+    sessions,
+    users,
+)
 from src.services.common import AuthError
 
 app = FastAPI(title="SmartCampus API")
@@ -15,6 +27,7 @@ ROUTERS = (
     blockings.router,
     planning.router,
     bookings.router,
+    requests.router,
     me.router,
 )
 for router in ROUTERS:

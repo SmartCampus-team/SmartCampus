@@ -1,6 +1,6 @@
 """Données de démonstration : un compte par rôle (SC-12), les salles du campus (SC-20),
 des réservations et des blocages sur les prochains jours ouvrés (SC-22), le catalogue
-d'équipements et leur affectation aux salles (SC-31).
+d'équipements et leur affectation aux salles (SC-31), des demandes administratives (SC-34).
 
 Usage, depuis le dossier backend :  python -m src.seed
 Le script peut être relancé : il ne recrée pas ce qui existe déjà, et ne recrée les
@@ -9,17 +9,19 @@ réservations et blocages de démonstration que s'il n'y en a plus à venir.
 
 from datetime import date, time, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.config import settings
 from src.database import SessionLocal
+from src.models.admin_request import AdminRequest, RequestType
 from src.models.blocking import Blocking
 from src.models.booking import Booking, BookingStatus
 from src.models.equipment import Equipment, EquipmentCategory
+from src.models.request_history import RequestHistory
 from src.models.room import Room, RoomStatus, RoomType
 from src.models.user import Role, User
-from src.services import campus_clock
+from src.services import campus_clock, request_service
 from src.services.security import hash_password
 
 DEMO_ACCOUNTS = [
@@ -29,6 +31,7 @@ DEMO_ACCOUNTS = [
     ("scolarite", "Agent Scolarité Démo", Role.SCOLARITE, True),
     ("admin", "Administrateur Démo", Role.ADMINISTRATEUR, True),
     ("desactive", "Compte Désactivé Démo", Role.ETUDIANT, False),
+    ("etudiant2", "Étudiante Démo 2", Role.ETUDIANT, True),  # SC-36 : la demande d'un autre étudiant
 ]
 
 # (code, bâtiment, type, capacité, statut, description)
@@ -158,6 +161,35 @@ def seed_equipment(db: Session) -> None:
     db.flush()
 
 
+# Demandes administratives (SC-34) : (étudiant, type, description, déposée il y a N jours)
+DEMO_REQUESTS = [
+    ("etudiant", RequestType.ATTESTATION_SCOLARITE, "Attestation de scolarité pour le dossier de bourse.", 6),
+    ("etudiant", RequestType.RELEVE_NOTES, "Relevé de notes du semestre 3, en deux exemplaires.", 4),
+    ("etudiant2", RequestType.DEMANDE_STAGE, "Convention de stage de fin d'année, du 2 février au 30 avril.", 3),
+    ("etudiant", RequestType.RECLAMATION, "La note du module Réseaux n'apparaît pas sur mon relevé.", 1),
+    ("etudiant2", RequestType.CERTIFICAT_REUSSITE, "Certificat de réussite de la première année.", 0),
+]
+
+
+def seed_requests(db: Session) -> None:
+    """Dépose les demandes de démonstration, « En attente », avec des dates de dépôt échelonnées.
+
+    Rien n'est créé s'il existe déjà des demandes : celles saisies pendant les essais sont gardées.
+    """
+    if db.scalar(select(func.count()).select_from(AdminRequest)):
+        print("demandes administratives déjà présentes")
+        return
+    users = {user.email.split("@")[0]: user for user in db.scalars(select(User))}
+    for login, request_type, description, days_ago in DEMO_REQUESTS:
+        request = request_service.create_request(db, users[login], request_type, description)
+        deposited = campus_clock.now() - timedelta(days=days_ago, hours=2)
+        request.created_at = request.updated_at = deposited
+        for line in db.scalars(select(RequestHistory).where(RequestHistory.request_id == request.id)):
+            line.created_at = deposited
+    db.flush()
+    print(f"créées         : {len(DEMO_REQUESTS)} demandes administratives en attente")
+
+
 def seed_bookings(db: Session) -> None:
     now = campus_clock.now()
     upcoming = db.scalar(select(Booking.id).where(Booking.start_at >= now).limit(1))
@@ -212,6 +244,7 @@ def main() -> None:
         seed_rooms(db)
         seed_equipment(db)
         seed_bookings(db)
+        seed_requests(db)
         db.commit()
     print("Mot de passe des comptes : valeur SEED_PASSWORD de backend/.env")
 
