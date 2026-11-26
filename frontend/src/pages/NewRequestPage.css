@@ -1,0 +1,64 @@
+/* Nouvelle demande (SC-34) : formulaire sur une colonne, numéro attribué bien visible après le dépôt */
+
+.request-form {
+  display: grid;
+  gap: 1.1rem;
+  max-width: 46rem;
+}
+
+.request-applicant {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.request-applicant legend {
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--sc-ink);
+}
+
+.request-applicant .input[readonly] {
+  background: var(--sc-hover);
+  color: var(--sc-muted);
+}
+
+.request-count {
+  text-align: right;
+}
+
+.request-form .form-actions {
+  margin-top: 0;
+}
+
+.request-created {
+  max-width: 46rem;
+  text-align: center;
+}
+
+.request-created-icon {
+  width: 40px;
+  height: 40px;
+  padding: 8px;
+  border-radius: 50%;
+  background: #e7f6ec;
+  color: #1e7a3c;
+}
+
+.request-created-label {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: var(--sc-muted);
+}
+
+.request-created-number {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--sc-ink);
+}
+
+.request-created .form-actions {
+  justify-content: center;
+}

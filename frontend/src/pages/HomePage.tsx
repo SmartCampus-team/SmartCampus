@@ -1,8 +1,8 @@
-// Accueil de SmartCampus (SC-11, SC-17, SC-25) : la barre du haut est dans AppLayout ;
-// chaque service devient un lien quand son écran est livré.
+// Accueil de SmartCampus (SC-11, SC-17, SC-25, SC-34) : la barre du haut est dans AppLayout ;
+// chaque service devient un lien quand son écran est livré, éventuellement différent selon le rôle.
 
 import type { ComponentType } from 'react'
-import { ROLE_LABELS, type SessionUser } from '../auth/session'
+import { ROLE_LABELS, type Role, type SessionUser } from '../auth/session'
 import {
   ArrowIcon,
   BuildingIcon,
@@ -25,6 +25,7 @@ interface Service {
   description: string
   Icon: ComponentType<IconProps>
   to?: string // page disponible
+  links?: Partial<Record<Role, string>> // page propre à un rôle (prioritaire sur to)
   sprint?: number // sinon, sprint qui la livre (cahier des charges, chapitre 8)
 }
 
@@ -45,6 +46,7 @@ const SERVICES: Service[] = [
     title: 'Démarches administratives',
     description: "Effectuez vos demandes administratives en ligne et suivez leur état d'avancement.",
     Icon: FileIcon,
+    links: { etudiant: '/demandes/nouvelle' }, // SC-34 : l'étudiant dépose une demande
     sprint: 4,
   },
 ]
@@ -97,27 +99,30 @@ export default function HomePage({ user }: Props) {
           Services campus
         </h2>
         <ul className="service-grid">
-          {SERVICES.map(({ title, description, Icon, to, sprint }) => (
-            <li key={title} className={to ? 'service-card is-available' : 'service-card'}>
-              <span className="service-icon">
-                <Icon />
-              </span>
-              <div>
-                <h3>
-                  {to ? (
-                    <Link to={to} className="service-link">
-                      {title}
-                      <ArrowIcon className="service-link-arrow" />
-                    </Link>
-                  ) : (
-                    title
-                  )}
-                </h3>
-                {sprint && <span className="sprint-badge">Sprint {sprint}</span>}
-                <p>{description}</p>
-              </div>
-            </li>
-          ))}
+          {SERVICES.map(({ title, description, Icon, links, sprint, ...service }) => {
+            const to = links?.[user.role] ?? service.to
+            return (
+              <li key={title} className={to ? 'service-card is-available' : 'service-card'}>
+                <span className="service-icon">
+                  <Icon />
+                </span>
+                <div>
+                  <h3>
+                    {to ? (
+                      <Link to={to} className="service-link">
+                        {title}
+                        <ArrowIcon className="service-link-arrow" />
+                      </Link>
+                    ) : (
+                      title
+                    )}
+                  </h3>
+                  {!to && sprint && <span className="sprint-badge">Sprint {sprint}</span>}
+                  <p>{description}</p>
+                </div>
+              </li>
+            )
+          })}
         </ul>
       </section>
 

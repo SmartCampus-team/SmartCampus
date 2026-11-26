@@ -10,6 +10,7 @@ import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import ManageRoomsPage from './pages/ManageRoomsPage'
 import MyBookingsPage from './pages/MyBookingsPage'
+import NewRequestPage from './pages/NewRequestPage'
 import ProfilePage from './pages/ProfilePage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import RoomPlanningPage from './pages/RoomPlanningPage'
@@ -30,6 +31,11 @@ function renderPage(session: Session, location: Location, onUserUpdated: (user: 
     // SC-28 : l'étudiant et l'enseignant ont des réservations ; l'API refuse aussi les autres rôles (403)
     if (!canBook(session.user.role)) return <Forbidden />
     return <MyBookingsPage session={session} location={location} />
+  }
+  if (path === '/demandes/nouvelle') {
+    // SC-34 : seul l'étudiant dépose une demande ; l'API refuse aussi les autres rôles (403)
+    if (session.user.role !== 'etudiant') return <Forbidden />
+    return <NewRequestPage session={session} />
   }
   const room = matchPath('/salles/:id', path)
   if (room && /^\d+$/.test(room.id)) {
