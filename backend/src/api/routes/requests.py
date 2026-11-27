@@ -1,4 +1,5 @@
-"""Demandes administratives (SC-34 : EF-REQ-01, EF-REQ-02, RG-13) et « Mes demandes » (SC-35 : EF-REQ-04, RG-14)."""
+"""Demandes administratives : dépôt (SC-34 : EF-REQ-01, EF-REQ-02, RG-13), « Mes demandes »
+(SC-35 : EF-REQ-04, RG-14) et détail (SC-36 : EF-REQ-05, RG-14)."""
 
 from datetime import datetime
 from typing import Annotated
@@ -17,6 +18,8 @@ from src.services.request_service import RequestFilters
 router = APIRouter(prefix="/api/requests", tags=["requests"])
 
 Student = Annotated[User, Depends(require_roles(Role.ETUDIANT))]
+# Le détail : l'étudiant pour ses demandes, l'agent de scolarité pour toutes (SC-36)
+Viewer = Annotated[User, Depends(require_roles(Role.ETUDIANT, Role.SCOLARITE))]
 Db = Annotated[Session, Depends(get_db)]
 
 Description = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=2000)]
@@ -83,3 +86,9 @@ def create_request(body: RequestCreate, student: Student, db: Db) -> AdminReques
     422 : description vide ; 403 : un autre rôle qu'étudiant.
     """
     return request_service.create_request(db, student, body.request_type, body.description)
+
+
+@router.get("/{request_id}", response_model=RequestOut)
+def get_request(request_id: int, user: Viewer, db: Db) -> AdminRequest:
+    """Le détail d'une demande ; 404 pour la demande d'un autre étudiant, même en modifiant l'URL."""
+    return request_service.get_request(db, user, request_id)

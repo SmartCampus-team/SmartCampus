@@ -5,6 +5,10 @@ de son historique (aucun statut → En attente).
 
 SC-35 (EF-REQ-04, RG-14) : « Mes demandes ». Le filtre sur l'étudiant vient toujours du jeton,
 jamais d'un paramètre : un étudiant ne voit que ses demandes.
+
+SC-36 (EF-REQ-05, RG-14) : le détail d'une demande. Un étudiant n'ouvre que les siennes : pour
+une autre, même existante, l'API répond 404, comme si elle n'existait pas. L'agent de scolarité
+ouvre toutes les demandes.
 """
 
 from dataclasses import dataclass
@@ -14,8 +18,11 @@ from sqlalchemy.orm import Session
 
 from src.models.admin_request import REQUEST_NUMBER_SEQ, AdminRequest, RequestStatus, RequestType
 from src.models.request_history import RequestHistory
-from src.models.user import User
+from src.models.user import Role, User
 from src.services import campus_clock
+from src.services.common import ServiceError
+
+REQUEST_NOT_FOUND = "Demande introuvable."
 
 
 def next_number(db: Session) -> str:
@@ -64,3 +71,11 @@ def list_mine(db: Session, student: User, filters: RequestFilters) -> list[Admin
     statement = select(AdminRequest).where(AdminRequest.student_id == student.id)
     statement = apply_filters(statement, filters).order_by(AdminRequest.updated_at.desc(), AdminRequest.id.desc())
     return list(db.scalars(statement))
+
+
+def get_request(db: Session, user: User, request_id: int) -> AdminRequest:
+    """La demande, si l'utilisateur en est l'auteur ou travaille à la scolarité ; 404 sinon."""
+    request = db.get(AdminRequest, request_id)
+    if request is None or (user.role != Role.SCOLARITE and request.student_id != user.id):
+        raise ServiceError(404, REQUEST_NOT_FOUND)
+    return request
