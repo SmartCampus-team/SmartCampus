@@ -1,4 +1,4 @@
-// Accueil de SmartCampus (SC-11, SC-17, SC-25, SC-34) : la barre du haut est dans AppLayout ;
+// Accueil de SmartCampus (SC-11, SC-17, SC-25, SC-34, SC-35) : la barre du haut est dans AppLayout ;
 // chaque service devient un lien quand son écran est livré, éventuellement différent selon le rôle.
 
 import type { ComponentType } from 'react'
@@ -46,7 +46,7 @@ const SERVICES: Service[] = [
     title: 'Démarches administratives',
     description: "Effectuez vos demandes administratives en ligne et suivez leur état d'avancement.",
     Icon: FileIcon,
-    links: { etudiant: '/demandes/nouvelle' }, // SC-34 : l'étudiant dépose une demande
+    links: { etudiant: '/demandes' }, // SC-35 : l'étudiant suit ses demandes et en dépose de nouvelles
     sprint: 4,
   },
 ]

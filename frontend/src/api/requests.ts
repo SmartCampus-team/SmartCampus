@@ -1,6 +1,7 @@
-// Demandes administratives des étudiants (SC-34, EF-REQ-01, EF-REQ-02).
+// Demandes administratives des étudiants (SC-34, EF-REQ-01, EF-REQ-02) et « Mes demandes » (SC-35, EF-REQ-04).
 
 import type { Session } from '../auth/session'
+import { withQuery } from '../router'
 import { apiJson } from './client'
 
 export type RequestType =
@@ -35,6 +36,18 @@ export interface RequestStudent {
   email: string
 }
 
+export const REQUEST_STATUSES = Object.keys(REQUEST_STATUS_LABELS) as RequestStatus[]
+
+/** Ligne d'une liste de demandes (SC-35) */
+export interface RequestSummary {
+  id: number
+  number: string
+  request_type: RequestType
+  status: RequestStatus
+  created_at: string
+  updated_at: string
+}
+
 export interface AdminRequest {
   id: number
   number: string // DA-AAAA-NNNNN
@@ -60,4 +73,20 @@ export function formatDateTime(iso: string): string {
   const moment = new Date(iso)
   const time = moment.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
   return `${moment.toLocaleDateString('fr-FR')} à ${time}`
+}
+
+export interface RequestFilters {
+  q?: string // numéro ou partie du numéro
+  status?: RequestStatus | ''
+  type?: RequestType | ''
+}
+
+/** Mes demandes (SC-35) : l'API ne renvoie que celles de l'étudiant connecté. */
+export function fetchMyRequests(session: Session, filters: RequestFilters = {}): Promise<RequestSummary[]> {
+  return apiJson<RequestSummary[]>(session, withQuery('/api/requests/me', { ...filters }))
+}
+
+/** « 24/11/2026 » */
+export function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('fr-FR')
 }

@@ -2,9 +2,14 @@
 
 Le dépôt crée la demande « En attente » avec son numéro DA-AAAA-NNNNN et la première ligne
 de son historique (aucun statut → En attente).
+
+SC-35 (EF-REQ-04, RG-14) : « Mes demandes ». Le filtre sur l'étudiant vient toujours du jeton,
+jamais d'un paramètre : un étudiant ne voit que ses demandes.
 """
 
-from sqlalchemy import select
+from dataclasses import dataclass
+
+from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
 from src.models.admin_request import REQUEST_NUMBER_SEQ, AdminRequest, RequestStatus, RequestType
@@ -35,3 +40,27 @@ def create_request(db: Session, student: User, request_type: RequestType, descri
     db.add(deposit)
     db.commit()
     return request
+
+
+@dataclass
+class RequestFilters:
+    query: str | None = None  # numéro, ou partie du numéro : « 00042 »
+    status: RequestStatus | None = None
+    request_type: RequestType | None = None
+
+
+def apply_filters(statement: Select, filters: RequestFilters) -> Select:
+    if filters.query and filters.query.strip():
+        statement = statement.where(AdminRequest.number.ilike(f"%{filters.query.strip()}%"))
+    if filters.status:
+        statement = statement.where(AdminRequest.status == filters.status)
+    if filters.request_type:
+        statement = statement.where(AdminRequest.request_type == filters.request_type)
+    return statement
+
+
+def list_mine(db: Session, student: User, filters: RequestFilters) -> list[AdminRequest]:
+    """Les demandes de l'étudiant connecté, la dernière mise à jour d'abord."""
+    statement = select(AdminRequest).where(AdminRequest.student_id == student.id)
+    statement = apply_filters(statement, filters).order_by(AdminRequest.updated_at.desc(), AdminRequest.id.desc())
+    return list(db.scalars(statement))
