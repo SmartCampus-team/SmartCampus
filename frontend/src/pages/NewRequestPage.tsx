@@ -1,6 +1,6 @@
 // Nouvelle demande administrative (SC-34, EF-REQ-01, EF-REQ-02) : l'étudiant choisit un type et
 // décrit sa demande ; son nom et son e-mail viennent de son compte. Après le dépôt, le numéro
-// DA-AAAA-NNNNN attribué par l'API s'affiche. Adresse : #/demandes/nouvelle
+// DA-AAAA-NNNNN attribué par l'API s'affiche (SC-35 : lien vers « Mes demandes »). Adresse : #/demandes/nouvelle
 
 import { useState, type FormEvent } from 'react'
 import { errorMessage } from '../api/client'
@@ -14,6 +14,7 @@ import {
 } from '../api/requests'
 import type { Session } from '../auth/session'
 import { CheckIcon, FileIcon } from '../components/icons'
+import { Link } from '../router'
 import './NewRequestPage.css'
 
 interface Props {
@@ -74,6 +75,9 @@ export default function NewRequestPage({ session }: Props) {
             <button type="button" className="button-secondary" onClick={startOver}>
               Déposer une autre demande
             </button>
+            <Link to="/demandes" className="button-secondary">
+              Voir mes demandes
+            </Link>
           </div>
         </section>
       </>

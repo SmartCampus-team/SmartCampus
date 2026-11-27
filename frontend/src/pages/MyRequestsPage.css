@@ -1,0 +1,94 @@
+/* « Mes demandes » (SC-35) : filtres sur une ligne, une carte par demande, lisible dès 360 px */
+
+.request-cta {
+  padding: 0.6rem 1.1rem;
+  border-radius: var(--sc-radius-control);
+  background: var(--sc-blue);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.request-cta:hover {
+  background: var(--sc-blue-dark);
+}
+
+.request-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  align-items: end;
+  gap: 1rem;
+}
+
+.request-filters .field {
+  margin: 0;
+}
+
+.request-filters-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.request-count-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--sc-muted);
+}
+
+.request-list {
+  list-style: none;
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+}
+
+.request-item {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem;
+  background: #fff;
+  border: 1px solid var(--sc-line-soft);
+  border-radius: var(--sc-radius-card);
+  box-shadow: 0 1px 2px rgba(15, 27, 61, 0.04);
+}
+
+.request-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.75rem;
+}
+
+.request-number {
+  margin: 0;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--sc-ink);
+}
+
+.request-number a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.request-number a:hover {
+  color: var(--sc-blue);
+  text-decoration: underline;
+}
+
+.request-type {
+  margin: 0;
+  font-weight: 600;
+  color: var(--sc-text);
+}
+
+.request-dates {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--sc-muted);
+}

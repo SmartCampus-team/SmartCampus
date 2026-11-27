@@ -1,4 +1,4 @@
-// Mise en page des pages connectées (SC-17, SC-20, SC-21, SC-19, SC-28) : barre du haut, navigation selon le rôle,
+// Mise en page des pages connectées (SC-17, SC-20, SC-21, SC-19, SC-28, SC-35) : barre du haut, navigation selon le rôle,
 // déconnexion (SC-15) et retour à la connexion quand le jeton expire.
 
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react'
@@ -39,6 +39,13 @@ const NAV_ITEMS: NavItem[] = [
     Icon: CalendarCheckIcon,
     roles: ['etudiant', 'enseignant'],
     isActive: (path) => path === '/reservations',
+  },
+  {
+    to: '/demandes',
+    label: 'Mes demandes',
+    Icon: FileIcon,
+    roles: ['etudiant'],
+    isActive: (path) => path === '/demandes' || path.startsWith('/demandes/'),
   },
   {
     to: '/gestion/salles',
@@ -148,13 +155,6 @@ export default function AppLayout({ session, path, onLoggedOut, onUserUpdated, c
                 </Link>
               )
             })}
-            {user.role === 'etudiant' && (
-              <span className="topnav-link is-soon" aria-disabled="true" title="Disponible au Sprint 4">
-                <FileIcon />
-                Mes demandes
-                <span className="visually-hidden"> (disponible au Sprint 4)</span>
-              </span>
-            )}
           </nav>
 
           <Link
