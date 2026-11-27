@@ -1,0 +1,39 @@
+/* Couleurs des statuts d'une demande (tableau 13) : attente ambre, traitement bleu,
+   action de l'étudiant violet, acceptée vert, refusée rouge, terminée gris */
+
+.request-status-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.request-status.is-en_attente {
+  background: var(--sc-warning-bg);
+  color: var(--sc-warning);
+}
+
+.request-status.is-en_cours {
+  background: var(--sc-tint);
+  color: var(--sc-blue);
+}
+
+.request-status.is-infos_demandees {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.request-status.is-acceptee {
+  background: var(--sc-success-bg);
+  color: var(--sc-success);
+}
+
+.request-status.is-refusee {
+  background: var(--sc-danger-bg);
+  color: var(--sc-danger);
+}
+
+.request-status.is-terminee {
+  background: var(--sc-neutral-bg);
+  color: var(--sc-neutral);
+}
