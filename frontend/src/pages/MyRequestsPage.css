@@ -66,8 +66,6 @@
 .request-number {
   margin: 0;
   font-size: 1.05rem;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
   color: var(--sc-ink);
 }
 

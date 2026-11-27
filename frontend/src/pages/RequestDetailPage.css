@@ -1,0 +1,72 @@
+/* Détail d'une demande (SC-36) : la demande à gauche, réponse et pièces à droite ;
+   une seule colonne sur téléphone */
+
+.request-head h1 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.5rem;
+}
+
+.request-head .request-status {
+  align-self: center;
+  font-size: 0.85rem;
+}
+
+.request-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.request-detail .panel {
+  margin-bottom: 0;
+}
+
+.request-side {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.request-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem 1.25rem;
+  margin: 0 0 1.25rem;
+}
+
+.request-facts dt {
+  font-size: 0.8rem;
+  color: var(--sc-muted);
+}
+
+.request-facts dd {
+  margin: 0.15rem 0 0;
+  font-weight: 600;
+  color: var(--sc-ink);
+  overflow-wrap: anywhere;
+}
+
+.request-subtitle {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+  color: var(--sc-ink);
+}
+
+.request-description {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.request-empty {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--sc-muted);
+}
+
+@media (max-width: 800px) {
+  .request-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
