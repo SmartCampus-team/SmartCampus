@@ -13,6 +13,7 @@ import MyBookingsPage from './pages/MyBookingsPage'
 import MyRequestsPage from './pages/MyRequestsPage'
 import NewRequestPage from './pages/NewRequestPage'
 import ProfilePage from './pages/ProfilePage'
+import RequestDetailPage from './pages/RequestDetailPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import RoomPlanningPage from './pages/RoomPlanningPage'
 import RoomsPage from './pages/RoomsPage'
@@ -42,6 +43,19 @@ function renderPage(session: Session, location: Location, onUserUpdated: (user: 
     // SC-34 : seul l'étudiant dépose une demande ; l'API refuse aussi les autres rôles (403)
     if (session.user.role !== 'etudiant') return <Forbidden />
     return <NewRequestPage session={session} />
+  }
+  const request = matchPath('/demandes/:id', path)
+  if (request && /^\d+$/.test(request.id)) {
+    // SC-36 : l'étudiant (ses demandes) et l'agent de scolarité (toutes) ; 403 pour les autres rôles
+    if (session.user.role !== 'etudiant' && session.user.role !== 'scolarite') return <Forbidden />
+    return (
+      <RequestDetailPage
+        key={request.id}
+        session={session}
+        requestId={Number(request.id)}
+        back={location.query.get('retour')}
+      />
+    )
   }
   const room = matchPath('/salles/:id', path)
   if (room && /^\d+$/.test(room.id)) {

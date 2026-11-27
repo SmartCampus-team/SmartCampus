@@ -1,6 +1,7 @@
 // « Mes demandes » (SC-35, EF-REQ-04, RG-14) : numéro, type, statut, dates de dépôt et de mise à jour.
 // Recherche par numéro, filtres par statut et par type ; l'API ne renvoie que les demandes de
-// l'étudiant connecté. Adresse : #/demandes?q=00042&statut=en_attente&type=releve_notes
+// l'étudiant connecté. Chaque numéro ouvre le détail (SC-36).
+// Adresse : #/demandes?q=00042&statut=en_attente&type=releve_notes
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { errorMessage } from '../api/client'
@@ -21,6 +22,7 @@ import type { Session } from '../auth/session'
 import RequestStatusBadge from '../components/RequestStatusBadge'
 import { FileIcon, PlusIcon, SearchIcon } from '../components/icons'
 import { Link, navigate, withQuery, type Location } from '../router'
+import { requestPath } from './RequestDetailPage'
 import './MyRequestsPage.css'
 
 interface Props {
@@ -174,7 +176,9 @@ export default function MyRequestsPage({ session, location }: Props) {
             {requests.map((request) => (
               <li key={request.id} className="request-item">
                 <div className="request-item-head">
-                  <h3 className="request-number">{request.number}</h3>
+                  <h3 className="request-number">
+                    <Link to={requestPath(request.id, filtersToPath(applied))}>{request.number}</Link>
+                  </h3>
                   <RequestStatusBadge status={request.status} />
                 </div>
                 <p className="request-type">{REQUEST_TYPE_LABELS[request.request_type]}</p>

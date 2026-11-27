@@ -1,4 +1,5 @@
-// Demandes administratives des étudiants (SC-34, EF-REQ-01, EF-REQ-02) et « Mes demandes » (SC-35, EF-REQ-04).
+// Demandes administratives des étudiants : dépôt (SC-34, EF-REQ-01, EF-REQ-02), « Mes demandes »
+// (SC-35, EF-REQ-04) et détail (SC-36, EF-REQ-05).
 
 import type { Session } from '../auth/session'
 import { withQuery } from '../router'
@@ -89,4 +90,9 @@ export function fetchMyRequests(session: Session, filters: RequestFilters = {}):
 /** « 24/11/2026 » */
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR')
+}
+
+/** Détail d'une demande (SC-36) : 404 pour la demande d'un autre étudiant. */
+export function fetchRequest(session: Session, id: number): Promise<AdminRequest> {
+  return apiJson<AdminRequest>(session, `/api/requests/${id}`)
 }
