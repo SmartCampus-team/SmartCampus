@@ -1,0 +1,86 @@
+
+# 1. Volume persistant PostgreSQL
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: smartcampus-postgres-data
+  namespace: smartcampus
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# 2. Deployment PostgreSQL
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smartcampus-db
+  namespace: smartcampus
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: smartcampus-db
+  template:
+    metadata:
+      labels:
+        app: smartcampus-db
+    spec:
+      containers:
+        - name: postgres
+          image: smartcampus-db:1.0
+          imagePullPolicy: Never
+
+          ports:
+            - containerPort: 5432
+
+          env:
+            - name: POSTGRES_USER
+              value: "smartcampus"
+            - name: POSTGRES_DB
+              value: "smartcampus"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smartcampus-db-secret
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U smartcampus -d smartcampus
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: smartcampus-postgres-data
+
+---
+# 3. Service PostgreSQL
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: smartcampus
+spec:
+  type: ClusterIP
+  selector:
+    app: smartcampus-db
+  ports:
+    - port: 5432
+      targetPort: 5432
