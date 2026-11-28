@@ -1,0 +1,51 @@
+
+# ==========================
+# 1. DEPLOYMENT FRONTEND
+# ==========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smartcampus-frontend
+  namespace: smartcampus
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: smartcampus-frontend
+
+  template:
+    metadata:
+      labels:
+        app: smartcampus-frontend
+
+    spec:
+      containers:
+        - name: frontend
+          image: smartcampus-frontend:1.0
+          imagePullPolicy: Never
+
+          ports:
+            - containerPort: 80
+
+
+# ==========================
+# 2. SERVICE FRONTEND
+# ==========================
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: smartcampus
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app: smartcampus-frontend
+
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
